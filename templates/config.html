@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配置 PR 监控</title>
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
+</head>
+
+<body>
+    <div class="container">
+        <h1 class="mb-4">配置 PR 监控</h1>
+        <p><a href="{{ url_for('index') }}" class="btn btn-secondary">返回监控页面</a></p>
+
+        {% if error %}
+        <div class="alert alert-danger" role="alert">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <h2 class="card-title">API 配置</h2>
+                <form method="POST" action="{{ url_for('config_page') }}">
+                    <div class="mb-3">
+                        <label for="access_token" class="form-label">Gitee 访问令牌 (Access Token):</label>
+                        <input type="password" class="form-control" id="access_token" name="access_token"
+                            value="{{ config.get('ACCESS_TOKEN', '') }}" placeholder="输入 Access Token">
+                    </div>
+                    <button type="submit" name="action" value="update_api" class="btn btn-primary">保存 API 配置</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <h2 class="card-title">添加 PR</h2>
+                <form method="POST" action="{{ url_for('config_page') }}">
+                    <div class="mb-3">
+                        <label for="owner" class="form-label">仓库拥有者 (Owner):</label>
+                        <input type="text" class="form-control" id="owner" name="owner"
+                            placeholder="输入仓库拥有者，如：mindspore">
+                    </div>
+                    <div class="mb-3">
+                        <label for="repo" class="form-label">仓库名称 (Repository):</label>
+                        <input type="text" class="form-control" id="repo" name="repo"
+                            placeholder="输入仓库名称，如：mindformers">
+                    </div>
+                    <div class="mb-3">
+                        <label for="pull_request_id" class="form-label">PR 编号 (Pull Request ID):</label>
+                        <input type="number" class="form-control" id="pull_request_id" name="pull_request_id"
+                            placeholder="输入 PR 编号">
+                    </div>
+                    <button type="submit" name="action" value="add_pr" class="btn btn-custom">添加 PR</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h2 class="card-title">当前监控的 PR</h2>
+                <table class="table table-striped table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col">仓库</th>
+                            <th scope="col">PR 编号</th>
+                            <th scope="col">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pr_config in config.get('PULL_REQUEST_LISTS', []) %}
+                        <tr>
+                            <td>{{ pr_config.OWNER }}/{{ pr_config.REPO }}</td>
+                            <td>{{ pr_config.PULL_REQUEST_ID }}</td>
+                            <td><a href="{{ url_for('config_page', action='delete_pr', owner=pr_config.OWNER, repo=pr_config.REPO, pr_id=pr_config.PULL_REQUEST_ID) }}"
+                                    class="btn btn-danger btn-sm">删除</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+</body>
+
+</html>

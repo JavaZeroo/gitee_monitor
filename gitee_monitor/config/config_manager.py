@@ -1,0 +1,187 @@
+"""
+配置管理模块，处理应用配置的加载、存储和访问
+"""
+import os
+import json
+import logging
+from typing import Dict, Any, List
+
+logger = logging.getLogger(__name__)
+
+class Config:
+    """配置管理类，处理配置的加载、存储和访问"""
+    
+    DEFAULT_CONFIG = {
+        "GITEA_URL": "https://gitee.com/api/v5",
+        "ACCESS_TOKEN": "",
+        "PULL_REQUEST_LISTS": [],  # PR监控列表，每个元素包含OWNER、REPO、PULL_REQUEST_ID
+        "CACHE_TTL": 300,  # 缓存生存时间（秒）
+        "POLL_INTERVAL": 60,  # 轮询间隔（秒）
+        "ENABLE_NOTIFICATIONS": False,  # 是否启用通知
+    }
+    
+    def __init__(self, config_file: str):
+        """
+        初始化配置管理器
+        
+        Args:
+            config_file: 配置文件路径
+        """
+        self.config_file = config_file
+        self.config = self.DEFAULT_CONFIG.copy()
+        self.load_config()
+        
+    def load_config(self) -> None:
+        """从文件加载配置"""
+        if os.path.exists(self.config_file):
+            try:
+                with open(self.config_file, 'r') as f:
+                    loaded_config = json.load(f)
+                    
+                    # 处理旧配置格式的兼容性
+                    if "OWNER" in loaded_config and "REPO" in loaded_config and "PULL_REQUEST_IDS" in loaded_config:
+                        # 转换旧格式到新格式
+                        owner = loaded_config.get("OWNER", "")
+                        repo = loaded_config.get("REPO", "")
+                        pr_ids = loaded_config.get("PULL_REQUEST_IDS", [])
+                        
+                        if owner and repo and pr_ids:
+                            self.config["PULL_REQUEST_LISTS"] = []
+                            for pr_id in pr_ids:
+                                self.config["PULL_REQUEST_LISTS"].append({
+                                    "OWNER": owner,
+                                    "REPO": repo,
+                                    "PULL_REQUEST_ID": pr_id
+                                })
+                        
+                        # 复制其他配置项
+                        for key in ["GITEA_URL", "ACCESS_TOKEN", "CACHE_TTL", "POLL_INTERVAL", "ENABLE_NOTIFICATIONS"]:
+                            if key in loaded_config:
+                                self.config[key] = loaded_config[key]
+                                
+                        logger.info("检测到旧配置格式，已自动转换为新格式")
+                        self.save_config()  # 保存转换后的配置
+                    else:
+                        # 新格式配置，直接更新
+                        for key in self.config:
+                            if key in loaded_config:
+                                self.config[key] = loaded_config[key]
+                                
+                logger.info(f"配置已从 {self.config_file} 加载")
+            except (json.JSONDecodeError, IOError) as e:
+                logger.error(f"加载配置文件失败: {e}")
+        else:
+            logger.warning(f"配置文件 {self.config_file} 不存在，使用默认配置")
+            self.save_config()  # 创建默认配置文件
+    
+    def save_config(self) -> None:
+        """保存配置到文件"""
+        try:
+            with open(self.config_file, 'w') as f:
+                json.dump(self.config, f, indent=4)
+            logger.info(f"配置已保存到 {self.config_file}")
+        except IOError as e:
+            logger.error(f"保存配置文件失败: {e}")
+    
+    def get(self, key: str, default: Any = None) -> Any:
+        """
+        获取配置项
+        
+        Args:
+            key: 配置项名称
+            default: 默认值，如果配置项不存在
+            
+        Returns:
+            配置项值
+        """
+        return self.config.get(key, default)
+    
+    def set(self, key: str, value: Any) -> None:
+        """
+        设置配置项
+        
+        Args:
+            key: 配置项名称
+            value: 配置项值
+        """
+        self.config[key] = value
+        
+    def update(self, config_dict: Dict[str, Any]) -> None:
+        """
+        批量更新配置
+        
+        Args:
+            config_dict: 包含多个配置项的字典
+        """
+        for key, value in config_dict.items():
+            if key in self.config:
+                self.config[key] = value
+    
+    def add_pr(self, owner: str, repo: str, pr_id: int) -> None:
+        """
+        添加 PR 到监控列表
+        
+        Args:
+            owner: 仓库拥有者
+            repo: 仓库名称
+            pr_id: PR ID
+        """
+        pr_lists = self.config.get("PULL_REQUEST_LISTS", [])
+        
+        # 检查是否已存在相同的PR
+        for existing_pr in pr_lists:
+            if (existing_pr.get("OWNER") == owner and 
+                existing_pr.get("REPO") == repo and 
+                existing_pr.get("PULL_REQUEST_ID") == pr_id):
+                logger.warning(f"PR #{pr_id} ({owner}/{repo}) 已存在于监控列表中")
+                return
+        
+        # 添加新PR
+        pr_lists.append({
+            "OWNER": owner,
+            "REPO": repo,
+            "PULL_REQUEST_ID": pr_id
+        })
+        self.config["PULL_REQUEST_LISTS"] = pr_lists
+        logger.info(f"添加 PR #{pr_id} ({owner}/{repo}) 到监控列表")
+    
+    def remove_pr(self, owner: str, repo: str, pr_id: int) -> None:
+        """
+        从监控列表中移除 PR
+        
+        Args:
+            owner: 仓库拥有者
+            repo: 仓库名称
+            pr_id: PR ID
+        """
+        pr_lists = self.config.get("PULL_REQUEST_LISTS", [])
+        
+        for i, existing_pr in enumerate(pr_lists):
+            if (existing_pr.get("OWNER") == owner and 
+                existing_pr.get("REPO") == repo and 
+                existing_pr.get("PULL_REQUEST_ID") == pr_id):
+                pr_lists.pop(i)
+                self.config["PULL_REQUEST_LISTS"] = pr_lists
+                logger.info(f"从监控列表中移除 PR #{pr_id} ({owner}/{repo})")
+                return
+        
+        logger.warning(f"未找到要移除的 PR #{pr_id} ({owner}/{repo})")
+    
+    def get_pr_lists(self) -> List[Dict[str, Any]]:
+        """
+        获取所有监控的 PR 列表
+        
+        Returns:
+            PR 列表，每个元素包含 OWNER、REPO、PULL_REQUEST_ID
+        """
+        return self.config.get("PULL_REQUEST_LISTS", [])
+    
+    def get_pr_ids(self) -> List[int]:
+        """
+        获取所有监控的 PR ID（兼容性方法，已废弃）
+        
+        Returns:
+            PR ID 列表
+        """
+        pr_lists = self.config.get("PULL_REQUEST_LISTS", [])
+        return [pr.get("PULL_REQUEST_ID") for pr in pr_lists if pr.get("PULL_REQUEST_ID")]

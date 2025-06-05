@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PR 标签监控</title>
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
+</head>
+
+<body>
+    <div class="container">
+        <h1 class="mb-4">PR 标签监控</h1>
+        <p><a href="{{ url_for('config_page') }}" class="btn btn-primary">修改配置</a></p>
+        <table class="table table-striped table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th scope="col">仓库</th>
+                    <th scope="col">PR 编号</th>
+                    <th scope="col">当前标签</th>
+                </tr>
+            </thead>
+            <tbody id="pr-table-body">
+                {% for cache_key, pr_info in pr_data.items() %}
+                <tr>
+                    <td>{{ pr_info.owner }}/{{ pr_info.repo }}</td>
+                    <td>{{ pr_info.pr_id }}</td>
+                    <td class="labels">{{ pr_info.current_labels | join(', ') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+    <script>
+        function updatePRLabels() {
+            fetch('/api/pr_labels')
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.querySelector('tbody');
+                    tableBody.innerHTML = '';
+                    for (const cacheKey in data) {
+                        const prInfo = data[cacheKey];
+                        const row = document.createElement('tr');
+                        
+                        const repoCell = document.createElement('td');
+                        repoCell.textContent = `${prInfo.owner}/${prInfo.repo}`;
+                        
+                        const prIdCell = document.createElement('td');
+                        prIdCell.textContent = prInfo.pr_id;
+                        
+                        const labelsCell = document.createElement('td');
+                        labelsCell.className = 'labels';
+                        labelsCell.textContent = prInfo.current_labels.join(', ');
+                        
+                        row.appendChild(repoCell);
+                        row.appendChild(prIdCell);
+                        row.appendChild(labelsCell);
+                        tableBody.appendChild(row);
+                    }
+                })
+                .catch(error => console.error('Error fetching PR labels:', error));
+        }
+        setInterval(updatePRLabels, 60000); // 每分钟刷新
+        updatePRLabels(); // 初始加载
+    </script>
+</body>
+
+</html>
