@@ -43,6 +43,8 @@
                     <tr>
                         <th scope="col">仓库</th>
                         <th scope="col">PR 编号</th>
+                        <th scope="col">提交人</th>
+                        <th scope="col">分支</th>
                         <th scope="col">当前标签</th>
                         <th scope="col">操作</th>
                     </tr>
@@ -50,8 +52,46 @@
                 <tbody id="pr-table-body">
                     {% for cache_key, pr_info in pr_data.items() %}
                     <tr data-owner="{{ pr_info.owner }}" data-repo="{{ pr_info.repo }}" data-pr-id="{{ pr_info.pr_id }}">
-                        <td>{{ pr_info.owner }}/{{ pr_info.repo }}</td>
-                        <td>{{ pr_info.pr_id }}</td>
+                        <td>
+                            {% if pr_info.pr_details and pr_info.pr_details.base and pr_info.pr_details.base.repo and pr_info.pr_details.base.repo.html_url %}
+                                <a href="{{ pr_info.pr_details.base.repo.html_url }}" target="_blank">{{ pr_info.owner }}/{{ pr_info.repo }}</a>
+                            {% else %}
+                                {{ pr_info.owner }}/{{ pr_info.repo }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if pr_info.pr_details and pr_info.pr_details.html_url %}
+                                <a href="{{ pr_info.pr_details.html_url }}" target="_blank">#{{ pr_info.pr_id }}</a>
+                            {% else %}
+                                #{{ pr_info.pr_id }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if pr_info.pr_details and pr_info.pr_details.user %}
+                                {% if pr_info.pr_details.user.html_url %}
+                                    <a href="{{ pr_info.pr_details.user.html_url }}" target="_blank">
+                                        {{ pr_info.pr_details.user.name or pr_info.pr_details.user.login }}
+                                    </a>
+                                {% else %}
+                                    {{ pr_info.pr_details.user.name or pr_info.pr_details.user.login }}
+                                {% endif %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if pr_info.pr_details and pr_info.pr_details.base and pr_info.pr_details.base.ref %}
+                                {% if pr_info.pr_details.base.repo and pr_info.pr_details.base.repo.html_url %}
+                                    <a href="{{ pr_info.pr_details.base.repo.html_url }}/tree/{{ pr_info.pr_details.base.ref }}" target="_blank">
+                                        {{ pr_info.pr_details.base.ref }}
+                                    </a>
+                                {% else %}
+                                    {{ pr_info.pr_details.base.ref }}
+                                {% endif %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
                         <td class="labels">
                             {% for label in pr_info.current_labels %}
                             <span class="label-text me-2" data-color="{{ label.color }}" style="font-weight: bold;">{{ label.name }}</span>
@@ -119,16 +159,54 @@
             row.setAttribute('data-repo', prData.repo);
             row.setAttribute('data-pr-id', prData.pr_id);
             
+            // 仓库列
             const repoCell = document.createElement('td');
-            repoCell.textContent = `${prData.owner}/${prData.repo}`;
+            if (prData.pr_details && prData.pr_details.base && prData.pr_details.base.repo && prData.pr_details.base.repo.html_url) {
+                repoCell.innerHTML = `<a href="${prData.pr_details.base.repo.html_url}" target="_blank">${prData.owner}/${prData.repo}</a>`;
+            } else {
+                repoCell.textContent = `${prData.owner}/${prData.repo}`;
+            }
             
+            // PR编号列
             const prIdCell = document.createElement('td');
-            prIdCell.textContent = prData.pr_id;
+            if (prData.pr_details && prData.pr_details.html_url) {
+                prIdCell.innerHTML = `<a href="${prData.pr_details.html_url}" target="_blank">#${prData.pr_id}</a>`;
+            } else {
+                prIdCell.textContent = `#${prData.pr_id}`;
+            }
             
+            // 提交人列
+            const authorCell = document.createElement('td');
+            if (prData.pr_details && prData.pr_details.user) {
+                const userName = prData.pr_details.user.name || prData.pr_details.user.login;
+                if (prData.pr_details.user.html_url) {
+                    authorCell.innerHTML = `<a href="${prData.pr_details.user.html_url}" target="_blank">${userName}</a>`;
+                } else {
+                    authorCell.textContent = userName;
+                }
+            } else {
+                authorCell.textContent = '-';
+            }
+            
+            // 分支列
+            const branchCell = document.createElement('td');
+            if (prData.pr_details && prData.pr_details.base && prData.pr_details.base.ref) {
+                const branchName = prData.pr_details.base.ref;
+                if (prData.pr_details.base.repo && prData.pr_details.base.repo.html_url) {
+                    branchCell.innerHTML = `<a href="${prData.pr_details.base.repo.html_url}/tree/${branchName}" target="_blank">${branchName}</a>`;
+                } else {
+                    branchCell.textContent = branchName;
+                }
+            } else {
+                branchCell.textContent = '-';
+            }
+            
+            // 标签列
             const labelsCell = document.createElement('td');
             labelsCell.className = 'labels';
             labelsCell.innerHTML = createLabelHTML(prData.current_labels);
             
+            // 操作列
             const actionCell = document.createElement('td');
             actionCell.innerHTML = `<button class="btn btn-danger btn-sm delete-pr-btn" 
                     data-owner="${prData.owner}" 
@@ -137,6 +215,8 @@
             
             row.appendChild(repoCell);
             row.appendChild(prIdCell);
+            row.appendChild(authorCell);
+            row.appendChild(branchCell);
             row.appendChild(labelsCell);
             row.appendChild(actionCell);
             tbody.appendChild(row);
@@ -233,16 +313,54 @@
                         row.setAttribute('data-repo', prInfo.repo);
                         row.setAttribute('data-pr-id', prInfo.pr_id);
                         
+                        // 仓库列
                         const repoCell = document.createElement('td');
-                        repoCell.textContent = `${prInfo.owner}/${prInfo.repo}`;
+                        if (prInfo.pr_details && prInfo.pr_details.base && prInfo.pr_details.base.repo && prInfo.pr_details.base.repo.html_url) {
+                            repoCell.innerHTML = `<a href="${prInfo.pr_details.base.repo.html_url}" target="_blank">${prInfo.owner}/${prInfo.repo}</a>`;
+                        } else {
+                            repoCell.textContent = `${prInfo.owner}/${prInfo.repo}`;
+                        }
                         
+                        // PR编号列
                         const prIdCell = document.createElement('td');
-                        prIdCell.textContent = prInfo.pr_id;
+                        if (prInfo.pr_details && prInfo.pr_details.html_url) {
+                            prIdCell.innerHTML = `<a href="${prInfo.pr_details.html_url}" target="_blank">#${prInfo.pr_id}</a>`;
+                        } else {
+                            prIdCell.textContent = `#${prInfo.pr_id}`;
+                        }
                         
+                        // 提交人列
+                        const authorCell = document.createElement('td');
+                        if (prInfo.pr_details && prInfo.pr_details.user) {
+                            const userName = prInfo.pr_details.user.name || prInfo.pr_details.user.login;
+                            if (prInfo.pr_details.user.html_url) {
+                                authorCell.innerHTML = `<a href="${prInfo.pr_details.user.html_url}" target="_blank">${userName}</a>`;
+                            } else {
+                                authorCell.textContent = userName;
+                            }
+                        } else {
+                            authorCell.textContent = '-';
+                        }
+                        
+                        // 分支列
+                        const branchCell = document.createElement('td');
+                        if (prInfo.pr_details && prInfo.pr_details.base && prInfo.pr_details.base.ref) {
+                            const branchName = prInfo.pr_details.base.ref;
+                            if (prInfo.pr_details.base.repo && prInfo.pr_details.base.repo.html_url) {
+                                branchCell.innerHTML = `<a href="${prInfo.pr_details.base.repo.html_url}/tree/${branchName}" target="_blank">${branchName}</a>`;
+                            } else {
+                                branchCell.textContent = branchName;
+                            }
+                        } else {
+                            branchCell.textContent = '-';
+                        }
+                        
+                        // 标签列
                         const labelsCell = document.createElement('td');
                         labelsCell.className = 'labels';
                         labelsCell.innerHTML = createLabelHTML(prInfo.current_labels);
                         
+                        // 操作列
                         const actionCell = document.createElement('td');
                         actionCell.innerHTML = `<button class="btn btn-danger btn-sm delete-pr-btn" 
                                 data-owner="${prInfo.owner}" 
@@ -251,6 +369,8 @@
                         
                         row.appendChild(repoCell);
                         row.appendChild(prIdCell);
+                        row.appendChild(authorCell);
+                        row.appendChild(branchCell);
                         row.appendChild(labelsCell);
                         row.appendChild(actionCell);
                         tableBody.appendChild(row);

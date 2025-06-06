@@ -102,6 +102,42 @@ class PRMonitor:
             self.poll_thread.join(timeout=1.0)
         logger.info("PR 监控服务已停止")
     
+    def get_pr_details(self, owner: str, repo: str, pr_id: int, force_refresh: bool = False) -> Optional[Dict[str, Any]]:
+        """
+        获取 PR 的详细信息，优先使用缓存
+        
+        Args:
+            owner: 仓库拥有者
+            repo: 仓库名称
+            pr_id: PR ID
+            force_refresh: 是否强制刷新缓存
+            
+        Returns:
+            PR 详细信息
+        """
+        cache_key = f"{owner}/{repo}#{pr_id}_details"
+        
+        if force_refresh:
+            self.cache.invalidate(cache_key)
+            
+        # 检查缓存
+        cached_data = self.cache.get(cache_key)
+        if cached_data:
+            return cached_data
+            
+        # 缓存不存在，从 API 获取
+        access_token = self.config.get("ACCESS_TOKEN")
+        
+        if not access_token:
+            logger.warning("无法获取 PR 详情：ACCESS_TOKEN 未配置")
+            return None
+            
+        pr_details = self.api_client.get_pr_details(owner, repo, pr_id)
+        if pr_details:
+            self.cache.set(cache_key, pr_details)
+            return pr_details
+        return None
+    
     def get_pr_labels(self, owner: str, repo: str, pr_id: int, force_refresh: bool = False) -> List[Dict[str, Any]]:
         """
         获取 PR 的标签，优先使用缓存

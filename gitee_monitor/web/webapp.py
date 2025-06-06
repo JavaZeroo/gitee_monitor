@@ -42,11 +42,14 @@ class WebApp:
                 if owner and repo and pr_id:
                     cache_key = f"{owner}/{repo}#{pr_id}"
                     labels = self.pr_monitor.get_pr_labels(owner, repo, pr_id)
+                    pr_details = self.pr_monitor.get_pr_details(owner, repo, pr_id)
+                    
                     pr_data[cache_key] = {
                         "current_labels": labels,  # 传递完整的标签对象，包含颜色信息
                         "owner": owner,
                         "repo": repo,
-                        "pr_id": pr_id
+                        "pr_id": pr_id,
+                        "pr_details": pr_details  # 包含提交人、分支等详细信息
                     }
             return render_template('index.html', pr_data=pr_data)
         
@@ -149,11 +152,14 @@ class WebApp:
                 if owner and repo and pr_id:
                     cache_key = f"{owner}/{repo}#{pr_id}"
                     labels = self.pr_monitor.get_pr_labels(owner, repo, pr_id, force_refresh=force_refresh)
+                    pr_details = self.pr_monitor.get_pr_details(owner, repo, pr_id, force_refresh=force_refresh)
+                    
                     pr_data[cache_key] = {
                         "current_labels": labels,  # 传递完整的标签对象，包含颜色信息
                         "owner": owner,
                         "repo": repo,
-                        "pr_id": pr_id
+                        "pr_id": pr_id,
+                        "pr_details": pr_details  # 包含提交人、分支等详细信息
                     }
             return jsonify(pr_data)
         
@@ -184,10 +190,12 @@ class WebApp:
             # 获取新添加PR的标签信息
             try:
                 labels = self.pr_monitor.get_pr_labels(owner, repo, pr_id)
+                pr_details = self.pr_monitor.get_pr_details(owner, repo, pr_id)
                 current_labels = labels  # 传递完整的标签对象
             except Exception as e:
-                logger.warning(f"获取新添加PR的标签失败: {e}")
+                logger.warning(f"获取新添加PR的信息失败: {e}")
                 current_labels = []
+                pr_details = None
             
             return jsonify({
                 'success': True, 
@@ -196,7 +204,8 @@ class WebApp:
                     'owner': owner,
                     'repo': repo,
                     'pr_id': pr_id,
-                    'current_labels': current_labels
+                    'current_labels': current_labels,
+                    'pr_details': pr_details
                 }
             })
         

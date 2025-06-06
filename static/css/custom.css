@@ -15,22 +15,30 @@
 
 /* 表格列自适应设置 */
 .table th:nth-child(1) { 
-    width: 25%; 
-    min-width: 150px; 
+    width: 20%; 
+    min-width: 120px; 
 } /* 仓库列 */
 .table th:nth-child(2) { 
-    width: 15%; 
-    min-width: 100px; 
+    width: 10%; 
+    min-width: 80px; 
     white-space: nowrap;
 } /* PR 编号列 */
 .table th:nth-child(3) { 
-    width: 100%; 
-    min-width: 200px; 
-} /* 当前标签列 */
+    width: 15%; 
+    min-width: 100px; 
+} /* 提交人列 */
 .table th:nth-child(4) { 
-    width: 8%; 
-    min-width: 20px; 
+    width: 15%; 
+    min-width: 100px; 
+} /* 分支列 */
+.table th:nth-child(5) { 
+    width: 30%; 
+    min-width: 150px; 
 } /* 当前标签列 */
+.table th:nth-child(6) { 
+    width: 10%; 
+    min-width: 80px; 
+} /* 操作列 */
 
 /* 防止表头文字换行 */
 .table th {
@@ -46,18 +54,40 @@
     word-wrap: break-word;
 }
 
+/* 表格内链接样式 */
+.table td a {
+    color: #0d6efd;
+    text-decoration: none;
+}
+
+.table td a:hover {
+    text-decoration: underline;
+    color: #0a58ca;
+}
+
 /* PR 编号列居中显示 */
 .table td:nth-child(2) {
     text-align: center;
     white-space: nowrap;
 }
 
-/* 标签列样式 */
+/* 提交人列样式 */
 .table td:nth-child(3) {
     word-break: break-word;
 }
 
+/* 分支列样式 */
 .table td:nth-child(4) {
+    word-break: break-word;
+}
+
+/* 标签列样式 */
+.table td:nth-child(5) {
+    word-break: break-word;
+}
+
+/* 操作列样式 */
+.table td:nth-child(6) {
     text-align: center;
     word-break: break-word;
 }
@@ -86,10 +116,12 @@
         padding: 8px 4px;
         font-size: 14px;
     }
-    
-    .table th:nth-child(1) { width: auto; min-width: 80px; }
-    .table th:nth-child(2) { width: auto; min-width: 80px; }
-    .table th:nth-child(3) { width: auto; min-width: 150px; }
+      .table th:nth-child(1) { width: auto; min-width: 80px; }
+    .table th:nth-child(2) { width: auto; min-width: 60px; }
+    .table th:nth-child(3) { width: auto; min-width: 80px; }
+    .table th:nth-child(4) { width: auto; min-width: 80px; }
+    .table th:nth-child(5) { width: auto; min-width: 120px; }
+    .table th:nth-child(6) { width: auto; min-width: 60px; }
 }
 
 @media (max-width: 576px) {
