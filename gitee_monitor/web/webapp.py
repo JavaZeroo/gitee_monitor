@@ -43,7 +43,7 @@ class WebApp:
                     cache_key = f"{owner}/{repo}#{pr_id}"
                     labels = self.pr_monitor.get_pr_labels(owner, repo, pr_id)
                     pr_data[cache_key] = {
-                        "current_labels": [label.get("name", "") for label in labels],
+                        "current_labels": labels,  # 传递完整的标签对象，包含颜色信息
                         "owner": owner,
                         "repo": repo,
                         "pr_id": pr_id
@@ -150,7 +150,7 @@ class WebApp:
                     cache_key = f"{owner}/{repo}#{pr_id}"
                     labels = self.pr_monitor.get_pr_labels(owner, repo, pr_id, force_refresh=force_refresh)
                     pr_data[cache_key] = {
-                        "current_labels": [label.get("name", "") for label in labels],
+                        "current_labels": labels,  # 传递完整的标签对象，包含颜色信息
                         "owner": owner,
                         "repo": repo,
                         "pr_id": pr_id
@@ -184,7 +184,7 @@ class WebApp:
             # 获取新添加PR的标签信息
             try:
                 labels = self.pr_monitor.get_pr_labels(owner, repo, pr_id)
-                current_labels = [label.get("name", "") for label in labels]
+                current_labels = labels  # 传递完整的标签对象
             except Exception as e:
                 logger.warning(f"获取新添加PR的标签失败: {e}")
                 current_labels = []
