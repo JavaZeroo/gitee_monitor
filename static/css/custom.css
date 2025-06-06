@@ -1,2 +1,94 @@
-.container { max-width: 800px; }
+.container { 
+    max-width: 1200px; 
+    margin: 0 auto;
+    padding: 0 15px;
+}
 .btn-custom { background-color: #28a745; color: white; }
+
+/* 自适应表格样式 */
+.table {
+    table-layout: fixed;
+    width: 100%;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+/* 表格列自适应设置 */
+.table th:nth-child(1) { 
+    width: 25%; 
+    min-width: 150px; 
+} /* 仓库列 */
+.table th:nth-child(2) { 
+    width: 15%; 
+    min-width: 100px; 
+    white-space: nowrap;
+} /* PR 编号列 */
+.table th:nth-child(3) { 
+    width: 60%; 
+    min-width: 200px; 
+} /* 当前标签列 */
+
+/* 防止表头文字换行 */
+.table th {
+    white-space: nowrap;
+    text-align: center;
+    padding: 12px 8px;
+}
+
+/* 表格内容对齐 */
+.table td {
+    vertical-align: middle;
+    padding: 10px 8px;
+    word-wrap: break-word;
+}
+
+/* PR 编号列居中显示 */
+.table td:nth-child(2) {
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* 标签列样式 */
+.table td:nth-child(3) {
+    word-break: break-word;
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+    .container {
+        max-width: 100%;
+    }
+    
+    .table {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 0 10px;
+    }
+    
+    .table {
+        table-layout: auto;
+    }
+    
+    .table th, .table td {
+        padding: 8px 4px;
+        font-size: 14px;
+    }
+    
+    .table th:nth-child(1) { width: auto; min-width: 80px; }
+    .table th:nth-child(2) { width: auto; min-width: 80px; }
+    .table th:nth-child(3) { width: auto; min-width: 150px; }
+}
+
+@media (max-width: 576px) {
+    .table {
+        font-size: 12px;
+    }
+    
+    .table th, .table td {
+        padding: 6px 3px;
+    }
+}

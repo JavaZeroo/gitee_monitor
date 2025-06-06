@@ -39,19 +39,10 @@
                 <h2 class="card-title">添加 PR</h2>
                 <form method="POST" action="{{ url_for('config_page') }}">
                     <div class="mb-3">
-                        <label for="owner" class="form-label">仓库拥有者 (Owner):</label>
-                        <input type="text" class="form-control" id="owner" name="owner"
-                            placeholder="输入仓库拥有者，如：mindspore">
-                    </div>
-                    <div class="mb-3">
-                        <label for="repo" class="form-label">仓库名称 (Repository):</label>
-                        <input type="text" class="form-control" id="repo" name="repo"
-                            placeholder="输入仓库名称，如：mindformers">
-                    </div>
-                    <div class="mb-3">
-                        <label for="pull_request_id" class="form-label">PR 编号 (Pull Request ID):</label>
-                        <input type="number" class="form-control" id="pull_request_id" name="pull_request_id"
-                            placeholder="输入 PR 编号">
+                        <label for="pr_url" class="form-label">PR URL:</label>
+                        <input type="url" class="form-control" id="pr_url" name="pr_url"
+                            placeholder="输入 PR 链接，如：https://gitee.com/owner/repo/pulls/1234">
+                        <div class="form-text">支持格式：https://gitee.com/{owner}/{repo}/pulls/{pr_id}</div>
                     </div>
                     <button type="submit" name="action" value="add_pr" class="btn btn-custom">添加 PR</button>
                 </form>

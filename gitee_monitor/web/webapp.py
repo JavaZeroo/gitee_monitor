@@ -2,6 +2,7 @@
 Flask Web 应用模块，处理 Web 界面和 API 请求
 """
 import logging
+import re
 from flask import Flask, request, render_template, redirect, url_for, jsonify
 
 from ..config.config_manager import Config
@@ -65,17 +66,25 @@ class WebApp:
                         self.config.save_config()
                         logger.info("API 配置更新完成")
                 elif action == 'add_pr':
-                    owner = request.form.get('owner', '').strip()
-                    repo = request.form.get('repo', '').strip()
-                    pr_id = request.form.get('pull_request_id', '').strip()
+                    pr_url = request.form.get('pr_url', '').strip()
                     
-                    if not owner or not repo or not pr_id or not pr_id.isdigit():
-                        error = '请填写完整且有效的仓库信息和 PR 编号！'
+                    if not pr_url:
+                        error = '请输入有效的 PR URL！'
                     else:
-                        pr_id = int(pr_id)
-                        self.config.add_pr(owner, repo, pr_id)
-                        self.config.save_config()
-                        logger.info(f"添加 PR #{pr_id} ({owner}/{repo}) 到监控列表")
+                        # 使用正则表达式解析 PR URL
+                        pattern = r'https://gitee\.com/([^/]+)/([^/]+)/pulls/(\d+)'
+                        match = re.match(pattern, pr_url)
+                        
+                        if not match:
+                            error = 'URL 格式不正确！请使用格式：https://gitee.com/{owner}/{repo}/pulls/{pr_id}'
+                        else:
+                            owner = match.group(1)
+                            repo = match.group(2)
+                            pr_id = int(match.group(3))
+                            
+                            self.config.add_pr(owner, repo, pr_id)
+                            self.config.save_config()
+                            logger.info(f"通过 URL 添加 PR #{pr_id} ({owner}/{repo}) 到监控列表")
                 if error:
                     return render_template('config.html', config=self.config, error=error)
                 return redirect(url_for('config_page'))
