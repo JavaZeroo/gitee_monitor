@@ -157,6 +157,77 @@ class WebApp:
                     }
             return jsonify(pr_data)
         
+        # 添加 PR API 端点
+        @self.app.route('/api/add_pr', methods=['POST'])
+        def api_add_pr():
+            data = request.get_json()
+            pr_url = data.get('pr_url', '').strip()
+            
+            if not pr_url:
+                return jsonify({'success': False, 'error': '请输入有效的 PR URL！'}), 400
+            
+            # 使用正则表达式解析 PR URL
+            pattern = r'https://gitee\.com/([^/]+)/([^/]+)/pulls/(\d+)'
+            match = re.match(pattern, pr_url)
+            
+            if not match:
+                return jsonify({'success': False, 'error': 'URL 格式不正确！请使用格式：https://gitee.com/{owner}/{repo}/pulls/{pr_id}'}), 400
+            
+            owner = match.group(1)
+            repo = match.group(2)
+            pr_id = int(match.group(3))
+            
+            self.config.add_pr(owner, repo, pr_id)
+            self.config.save_config()
+            logger.info(f"通过 API 添加 PR #{pr_id} ({owner}/{repo}) 到监控列表")
+            
+            return jsonify({
+                'success': True, 
+                'message': 'PR 添加成功',
+                'pr_data': {
+                    'owner': owner,
+                    'repo': repo,
+                    'pr_id': pr_id
+                }
+            })
+        
+        # 删除 PR API 端点
+        @self.app.route('/api/delete_pr', methods=['DELETE'])
+        def api_delete_pr():
+            data = request.get_json()
+            owner = data.get('owner')
+            repo = data.get('repo')
+            pr_id = data.get('pr_id')
+            
+            if not owner or not repo or not pr_id:
+                return jsonify({'success': False, 'error': '缺少必要参数'}), 400
+            
+            try:
+                pr_id = int(pr_id)
+                self.config.remove_pr(owner, repo, pr_id)
+                self.config.save_config()
+                logger.info(f"通过 API 删除 PR #{pr_id} ({owner}/{repo}) 从监控列表")
+                return jsonify({'success': True, 'message': 'PR 删除成功'})
+            except ValueError:
+                return jsonify({'success': False, 'error': 'PR ID 必须是数字'}), 400
+        
+        # 更新API配置 API 端点
+        @self.app.route('/api/update_api', methods=['POST'])
+        def api_update_api():
+            data = request.get_json()
+            access_token = data.get('access_token', '').strip()
+            
+            if not access_token:
+                return jsonify({'success': False, 'error': 'ACCESS_TOKEN 是必填的！'}), 400
+            
+            self.config.update({
+                "ACCESS_TOKEN": access_token
+            })
+            self.config.save_config()
+            logger.info("通过 API 更新 API 配置")
+            
+            return jsonify({'success': True, 'message': 'API 配置更新成功'})
+        
     def run(self, host: str = '0.0.0.0', port: int = 5000, debug: bool = False) -> None:
         """
         运行 Web 应用

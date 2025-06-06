@@ -23,13 +23,13 @@
         <div class="card mb-4">
             <div class="card-body">
                 <h2 class="card-title">API 配置</h2>
-                <form method="POST" action="{{ url_for('config_page') }}">
+                <form id="api-config-form">
                     <div class="mb-3">
                         <label for="access_token" class="form-label">Gitee 访问令牌 (Access Token):</label>
                         <input type="password" class="form-control" id="access_token" name="access_token"
                             value="{{ config.get('ACCESS_TOKEN', '') }}" placeholder="输入 Access Token">
                     </div>
-                    <button type="submit" name="action" value="update_api" class="btn btn-primary">保存 API 配置</button>
+                    <button type="submit" class="btn btn-primary">保存 API 配置</button>
                 </form>
             </div>
         </div>
@@ -37,14 +37,14 @@
         <div class="card mb-4">
             <div class="card-body">
                 <h2 class="card-title">添加 PR</h2>
-                <form method="POST" action="{{ url_for('config_page') }}">
+                <form id="add-pr-form">
                     <div class="mb-3">
                         <label for="pr_url" class="form-label">PR URL:</label>
                         <input type="url" class="form-control" id="pr_url" name="pr_url"
                             placeholder="输入 PR 链接，如：https://gitee.com/owner/repo/pulls/1234">
                         <div class="form-text">支持格式：https://gitee.com/{owner}/{repo}/pulls/{pr_id}</div>
                     </div>
-                    <button type="submit" name="action" value="add_pr" class="btn btn-custom">添加 PR</button>
+                    <button type="submit" class="btn btn-custom">添加 PR</button>
                 </form>
             </div>
         </div>
@@ -60,13 +60,15 @@
                             <th scope="col">操作</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="pr-list-body">
                         {% for pr_config in config.get('PULL_REQUEST_LISTS', []) %}
-                        <tr>
+                        <tr data-owner="{{ pr_config.OWNER }}" data-repo="{{ pr_config.REPO }}" data-pr-id="{{ pr_config.PULL_REQUEST_ID }}">
                             <td>{{ pr_config.OWNER }}/{{ pr_config.REPO }}</td>
                             <td>{{ pr_config.PULL_REQUEST_ID }}</td>
-                            <td><a href="{{ url_for('config_page', action='delete_pr', owner=pr_config.OWNER, repo=pr_config.REPO, pr_id=pr_config.PULL_REQUEST_ID) }}"
-                                    class="btn btn-danger btn-sm">删除</a></td>
+                            <td><button class="btn btn-danger btn-sm delete-pr-btn" 
+                                    data-owner="{{ pr_config.OWNER }}" 
+                                    data-repo="{{ pr_config.REPO }}" 
+                                    data-pr-id="{{ pr_config.PULL_REQUEST_ID }}">删除</button></td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -75,6 +77,161 @@
         </div>
     </div>
     <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+    <script>
+        // 显示消息提示
+        function showMessage(message, type = 'success') {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            const container = document.querySelector('.container');
+            const existingAlert = container.querySelector('.alert');
+            if (existingAlert) {
+                existingAlert.remove();
+            }
+            
+            container.insertBefore(alertDiv, container.firstElementChild.nextSibling);
+            
+            // 5秒后自动消失
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 5000);
+        }
+
+        // 动态添加PR到表格
+        function addPRToTable(prData) {
+            const tbody = document.getElementById('pr-list-body');
+            const row = document.createElement('tr');
+            row.setAttribute('data-owner', prData.owner);
+            row.setAttribute('data-repo', prData.repo);
+            row.setAttribute('data-pr-id', prData.pr_id);
+            
+            row.innerHTML = `
+                <td>${prData.owner}/${prData.repo}</td>
+                <td>${prData.pr_id}</td>
+                <td><button class="btn btn-danger btn-sm delete-pr-btn" 
+                        data-owner="${prData.owner}" 
+                        data-repo="${prData.repo}" 
+                        data-pr-id="${prData.pr_id}">删除</button></td>
+            `;
+            
+            tbody.appendChild(row);
+        }
+
+        // 处理API配置表单
+        document.getElementById('api-config-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const accessToken = document.getElementById('access_token').value.trim();
+            if (!accessToken) {
+                showMessage('ACCESS_TOKEN 是必填的！', 'danger');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/update_api', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ access_token: accessToken })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(result.message, 'success');
+                } else {
+                    showMessage(result.error, 'danger');
+                }
+            } catch (error) {
+                showMessage('更新API配置时发生错误：' + error.message, 'danger');
+            }
+        });
+
+        // 处理添加PR表单
+        document.getElementById('add-pr-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const prUrl = document.getElementById('pr_url').value.trim();
+            if (!prUrl) {
+                showMessage('请输入有效的 PR URL！', 'danger');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/add_pr', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ pr_url: prUrl })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(result.message, 'success');
+                    document.getElementById('pr_url').value = '';
+                    // 动态添加新行到表格
+                    addPRToTable(result.pr_data);
+                } else {
+                    showMessage(result.error, 'danger');
+                }
+            } catch (error) {
+                showMessage('添加PR时发生错误：' + error.message, 'danger');
+            }
+        });
+
+        // 处理删除PR按钮
+        document.addEventListener('click', async function(e) {
+            if (e.target.classList.contains('delete-pr-btn')) {
+                e.preventDefault();
+                
+                const owner = e.target.dataset.owner;
+                const repo = e.target.dataset.repo;
+                const prId = e.target.dataset.prId;
+                
+                if (!confirm(`确定要删除 ${owner}/${repo} 的 PR #${prId} 吗？`)) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/delete_pr', {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ 
+                            owner: owner, 
+                            repo: repo, 
+                            pr_id: prId 
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        showMessage(result.message, 'success');
+                        // 从DOM中移除该行
+                        const row = e.target.closest('tr');
+                        if (row) {
+                            row.remove();
+                        }
+                    } else {
+                        showMessage(result.error, 'danger');
+                    }
+                } catch (error) {
+                    showMessage('删除PR时发生错误：' + error.message, 'danger');
+                }
+            }
+        });
+    </script>
 </body>
 
 </html>
