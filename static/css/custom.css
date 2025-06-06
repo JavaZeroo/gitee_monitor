@@ -27,6 +27,10 @@
     width: 60%; 
     min-width: 200px; 
 } /* 当前标签列 */
+.table th:nth-child(4) { 
+    width: 8%; 
+    min-width: 20px; 
+} /* 当前标签列 */
 
 /* 防止表头文字换行 */
 .table th {
@@ -50,6 +54,11 @@
 
 /* 标签列样式 */
 .table td:nth-child(3) {
+    word-break: break-word;
+}
+
+.table td:nth-child(4) {
+    text-align: center;
     word-break: break-word;
 }
 

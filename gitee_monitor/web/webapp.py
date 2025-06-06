@@ -181,13 +181,22 @@ class WebApp:
             self.config.save_config()
             logger.info(f"通过 API 添加 PR #{pr_id} ({owner}/{repo}) 到监控列表")
             
+            # 获取新添加PR的标签信息
+            try:
+                labels = self.pr_monitor.get_pr_labels(owner, repo, pr_id)
+                current_labels = [label.get("name", "") for label in labels]
+            except Exception as e:
+                logger.warning(f"获取新添加PR的标签失败: {e}")
+                current_labels = []
+            
             return jsonify({
                 'success': True, 
                 'message': 'PR 添加成功',
                 'pr_data': {
                     'owner': owner,
                     'repo': repo,
-                    'pr_id': pr_id
+                    'pr_id': pr_id,
+                    'current_labels': current_labels
                 }
             })
         

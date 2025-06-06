@@ -12,22 +12,44 @@
 <body>
     <div class="container">
         <h1 class="mb-4">PR 标签监控</h1>
+        
+        <!-- 添加PR表单 -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">快速添加 PR</h5>
+                <form id="add-pr-form" class="row g-3">
+                    <div class="col-md-9">
+                        <input type="url" class="form-control" id="pr_url" name="pr_url"
+                            placeholder="输入 PR 链接，如：https://gitee.com/owner/repo/pulls/1234">
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-success w-100">添加 PR</button>
+                    </div>
+                </form>
+                <div class="form-text mt-2">支持格式：https://gitee.com/{owner}/{repo}/pulls/{pr_id}</div>
+            </div>
+        </div>
+        
         <p><a href="{{ url_for('config_page') }}" class="btn btn-primary">修改配置</a></p>
-        <div class="table-responsive">
-            <table class="table table-striped table-hover">
+        <div class="table-responsive">                <table class="table table-striped table-hover">
                 <thead class="table-light">
                     <tr>
                         <th scope="col">仓库</th>
                         <th scope="col">PR 编号</th>
                         <th scope="col">当前标签</th>
+                        <th scope="col">操作</th>
                     </tr>
                 </thead>
                 <tbody id="pr-table-body">
                     {% for cache_key, pr_info in pr_data.items() %}
-                    <tr>
+                    <tr data-owner="{{ pr_info.owner }}" data-repo="{{ pr_info.repo }}" data-pr-id="{{ pr_info.pr_id }}">
                         <td>{{ pr_info.owner }}/{{ pr_info.repo }}</td>
                         <td>{{ pr_info.pr_id }}</td>
                         <td class="labels">{{ pr_info.current_labels | join(', ') }}</td>
+                        <td><button class="btn btn-danger btn-sm delete-pr-btn" 
+                                data-owner="{{ pr_info.owner }}" 
+                                data-repo="{{ pr_info.repo }}" 
+                                data-pr-id="{{ pr_info.pr_id }}">删除</button></td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -36,15 +58,152 @@
     </div>
     <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
     <script>
+        // 显示消息提示
+        function showMessage(message, type = 'success') {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            const container = document.querySelector('.container');
+            const existingAlert = container.querySelector('.alert');
+            if (existingAlert) {
+                existingAlert.remove();
+            }
+            
+            container.insertBefore(alertDiv, container.firstElementChild.nextSibling);
+            
+            // 5秒后自动消失
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 5000);
+        }
+
+        // 动态添加PR到表格
+        function addPRToTable(prData) {
+            const tbody = document.getElementById('pr-table-body');
+            const row = document.createElement('tr');
+            row.setAttribute('data-owner', prData.owner);
+            row.setAttribute('data-repo', prData.repo);
+            row.setAttribute('data-pr-id', prData.pr_id);
+            
+            const repoCell = document.createElement('td');
+            repoCell.textContent = `${prData.owner}/${prData.repo}`;
+            
+            const prIdCell = document.createElement('td');
+            prIdCell.textContent = prData.pr_id;
+            
+            const labelsCell = document.createElement('td');
+            labelsCell.className = 'labels';
+            labelsCell.textContent = prData.current_labels.join(', ');
+            
+            const actionCell = document.createElement('td');
+            actionCell.innerHTML = `<button class="btn btn-danger btn-sm delete-pr-btn" 
+                    data-owner="${prData.owner}" 
+                    data-repo="${prData.repo}" 
+                    data-pr-id="${prData.pr_id}">删除</button>`;
+            
+            row.appendChild(repoCell);
+            row.appendChild(prIdCell);
+            row.appendChild(labelsCell);
+            row.appendChild(actionCell);
+            tbody.appendChild(row);
+        }
+
+        // 处理添加PR表单
+        document.getElementById('add-pr-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const prUrl = document.getElementById('pr_url').value.trim();
+            if (!prUrl) {
+                showMessage('请输入有效的 PR URL！', 'danger');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/add_pr', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ pr_url: prUrl })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(result.message, 'success');
+                    document.getElementById('pr_url').value = '';
+                    // 动态添加新行到表格
+                    addPRToTable(result.pr_data);
+                } else {
+                    showMessage(result.error, 'danger');
+                }
+            } catch (error) {
+                showMessage('添加PR时发生错误：' + error.message, 'danger');
+            }
+        });
+
+        // 处理删除PR按钮
+        document.addEventListener('click', async function(e) {
+            if (e.target.classList.contains('delete-pr-btn')) {
+                e.preventDefault();
+                
+                const owner = e.target.dataset.owner;
+                const repo = e.target.dataset.repo;
+                const prId = e.target.dataset.prId;
+                
+                if (!confirm(`确定要删除 ${owner}/${repo} 的 PR #${prId} 吗？`)) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/delete_pr', {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ 
+                            owner: owner, 
+                            repo: repo, 
+                            pr_id: prId 
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        showMessage(result.message, 'success');
+                        // 从DOM中移除该行
+                        const row = e.target.closest('tr');
+                        if (row) {
+                            row.remove();
+                        }
+                    } else {
+                        showMessage(result.error, 'danger');
+                    }
+                } catch (error) {
+                    showMessage('删除PR时发生错误：' + error.message, 'danger');
+                }
+            }
+        });
+
         function updatePRLabels() {
             fetch('/api/pr_labels')
                 .then(response => response.json())
                 .then(data => {
-                    const tableBody = document.querySelector('tbody');
+                    const tableBody = document.querySelector('#pr-table-body');
                     tableBody.innerHTML = '';
                     for (const cacheKey in data) {
                         const prInfo = data[cacheKey];
                         const row = document.createElement('tr');
+                        row.setAttribute('data-owner', prInfo.owner);
+                        row.setAttribute('data-repo', prInfo.repo);
+                        row.setAttribute('data-pr-id', prInfo.pr_id);
                         
                         const repoCell = document.createElement('td');
                         repoCell.textContent = `${prInfo.owner}/${prInfo.repo}`;
@@ -56,9 +215,16 @@
                         labelsCell.className = 'labels';
                         labelsCell.textContent = prInfo.current_labels.join(', ');
                         
+                        const actionCell = document.createElement('td');
+                        actionCell.innerHTML = `<button class="btn btn-danger btn-sm delete-pr-btn" 
+                                data-owner="${prInfo.owner}" 
+                                data-repo="${prInfo.repo}" 
+                                data-pr-id="${prInfo.pr_id}">删除</button>`;
+                        
                         row.appendChild(repoCell);
                         row.appendChild(prIdCell);
                         row.appendChild(labelsCell);
+                        row.appendChild(actionCell);
                         tableBody.appendChild(row);
                     }
                 })
