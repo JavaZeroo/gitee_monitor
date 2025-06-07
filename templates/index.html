@@ -43,8 +43,10 @@
                     <tr>
                         <th scope="col">仓库</th>
                         <th scope="col">PR 编号</th>
+                        <th scope="col">PR 名称</th>
                         <th scope="col">提交人</th>
                         <th scope="col">分支</th>
+                        <th scope="col">状态</th>
                         <th scope="col">当前标签</th>
                         <th scope="col">操作</th>
                     </tr>
@@ -64,6 +66,19 @@
                                 <a href="{{ pr_info.pr_details.html_url }}" target="_blank">#{{ pr_info.pr_id }}</a>
                             {% else %}
                                 #{{ pr_info.pr_id }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if pr_info.pr_details and pr_info.pr_details.title %}
+                                {% if pr_info.pr_details.html_url %}
+                                    <a href="{{ pr_info.pr_details.html_url }}" target="_blank" title="{{ pr_info.pr_details.title }}">
+                                        {{ pr_info.pr_details.title }}
+                                    </a>
+                                {% else %}
+                                    {{ pr_info.pr_details.title }}
+                                {% endif %}
+                            {% else %}
+                                -
                             {% endif %}
                         </td>
                         <td>
@@ -90,6 +105,21 @@
                                 {% endif %}
                             {% else %}
                                 -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if pr_info.pr_details and pr_info.pr_details.state %}
+                                {% if pr_info.pr_details.state == 'open' %}
+                                    <span class="badge bg-success">Open</span>
+                                {% elif pr_info.pr_details.state == 'closed' %}
+                                    <span class="badge bg-danger">Closed</span>
+                                {% elif pr_info.pr_details.state == 'merged' %}
+                                    <span class="badge bg-secondary">Merged</span>
+                                {% else %}
+                                    <span class="badge bg-warning">{{ pr_info.pr_details.state|title }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge bg-light text-dark">-</span>
                             {% endif %}
                         </td>
                         <td class="labels">
@@ -175,6 +205,18 @@
                 prIdCell.textContent = `#${prData.pr_id}`;
             }
             
+            // PR名称列
+            const titleCell = document.createElement('td');
+            if (prData.pr_details && prData.pr_details.title) {
+                if (prData.pr_details.html_url) {
+                    titleCell.innerHTML = `<a href="${prData.pr_details.html_url}" target="_blank" title="${prData.pr_details.title}">${prData.pr_details.title}</a>`;
+                } else {
+                    titleCell.textContent = prData.pr_details.title;
+                }
+            } else {
+                titleCell.textContent = '-';
+            }
+            
             // 提交人列
             const authorCell = document.createElement('td');
             if (prData.pr_details && prData.pr_details.user) {
@@ -201,6 +243,29 @@
                 branchCell.textContent = '-';
             }
             
+            // 状态列
+            const statusCell = document.createElement('td');
+            if (prData.pr_details && prData.pr_details.state) {
+                const state = prData.pr_details.state;
+                let badgeClass = 'bg-warning';
+                let displayText = state.charAt(0).toUpperCase() + state.slice(1);
+                
+                if (state === 'open') {
+                    badgeClass = 'bg-success';
+                    displayText = 'Open';
+                } else if (state === 'closed') {
+                    badgeClass = 'bg-danger';
+                    displayText = 'Closed';
+                } else if (state === 'merged') {
+                    badgeClass = 'bg-secondary';
+                    displayText = 'Merged';
+                }
+                
+                statusCell.innerHTML = `<span class="badge ${badgeClass}">${displayText}</span>`;
+            } else {
+                statusCell.innerHTML = `<span class="badge bg-light text-dark">-</span>`;
+            }
+            
             // 标签列
             const labelsCell = document.createElement('td');
             labelsCell.className = 'labels';
@@ -215,8 +280,10 @@
             
             row.appendChild(repoCell);
             row.appendChild(prIdCell);
+            row.appendChild(titleCell);
             row.appendChild(authorCell);
             row.appendChild(branchCell);
+            row.appendChild(statusCell);
             row.appendChild(labelsCell);
             row.appendChild(actionCell);
             tbody.appendChild(row);
@@ -329,6 +396,18 @@
                             prIdCell.textContent = `#${prInfo.pr_id}`;
                         }
                         
+                        // PR名称列
+                        const titleCell = document.createElement('td');
+                        if (prInfo.pr_details && prInfo.pr_details.title) {
+                            if (prInfo.pr_details.html_url) {
+                                titleCell.innerHTML = `<a href="${prInfo.pr_details.html_url}" target="_blank" title="${prInfo.pr_details.title}">${prInfo.pr_details.title}</a>`;
+                            } else {
+                                titleCell.textContent = prInfo.pr_details.title;
+                            }
+                        } else {
+                            titleCell.textContent = '-';
+                        }
+                        
                         // 提交人列
                         const authorCell = document.createElement('td');
                         if (prInfo.pr_details && prInfo.pr_details.user) {
@@ -355,6 +434,29 @@
                             branchCell.textContent = '-';
                         }
                         
+                        // 状态列
+                        const statusCell = document.createElement('td');
+                        if (prInfo.pr_details && prInfo.pr_details.state) {
+                            const state = prInfo.pr_details.state;
+                            let badgeClass = 'bg-warning';
+                            let displayText = state.charAt(0).toUpperCase() + state.slice(1);
+                            
+                            if (state === 'open') {
+                                badgeClass = 'bg-success';
+                                displayText = 'Open';
+                            } else if (state === 'closed') {
+                                badgeClass = 'bg-danger';
+                                displayText = 'Closed';
+                            } else if (state === 'merged') {
+                                badgeClass = 'bg-secondary';
+                                displayText = 'Merged';
+                            }
+                            
+                            statusCell.innerHTML = `<span class="badge ${badgeClass}">${displayText}</span>`;
+                        } else {
+                            statusCell.innerHTML = `<span class="badge bg-light text-dark">-</span>`;
+                        }
+                        
                         // 标签列
                         const labelsCell = document.createElement('td');
                         labelsCell.className = 'labels';
@@ -369,8 +471,10 @@
                         
                         row.appendChild(repoCell);
                         row.appendChild(prIdCell);
+                        row.appendChild(titleCell);
                         row.appendChild(authorCell);
                         row.appendChild(branchCell);
+                        row.appendChild(statusCell);
                         row.appendChild(labelsCell);
                         row.appendChild(actionCell);
                         tableBody.appendChild(row);
