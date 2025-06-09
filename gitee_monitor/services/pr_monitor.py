@@ -7,8 +7,14 @@ import threading
 from typing import Dict, Any, Set, List, Optional
 from datetime import datetime, timedelta
 
-from ..api.gitee_api import GiteeAPIClient
+from ..api.api_client_factory import APIClientFactory
+from ..api.base_api import BaseAPIClient
+from ..models import PullRequest
 from ..config.config_manager import Config
+
+# 确保API客户端已注册到工厂
+from ..api import gitee_api
+from ..api import github_api
 
 logger = logging.getLogger(__name__)
 
@@ -68,20 +74,90 @@ class PRCache:
 class PRMonitor:
     """PR 监控服务，监控 PR 标签变化并发送通知"""
     
-    def __init__(self, config: Config, api_client: GiteeAPIClient):
+    def __init__(self, config: Config, platforms: List[str] = None):
         """
         初始化 PR 监控服务
         
         Args:
             config: 配置管理器
-            api_client: Gitee API 客户端
+            platforms: 支持的平台列表，如 ['gitee', 'github']，如果为None则自动检测
         """
         self.config = config
-        self.api_client = api_client
+        
+        # 如果没有指定平台，则自动检测配置中需要的平台
+        if platforms is None:
+            detected_platforms = set()
+            
+            # 从PR列表中检测平台，但只有在有相应访问令牌时才添加
+            for pr_config in self.config.get_pr_lists():
+                platform = pr_config.get("PLATFORM", "gitee")
+                if platform == "gitee" and self.config.get("ACCESS_TOKEN"):
+                    detected_platforms.add(platform)
+                elif platform == "github" and self.config.get("GITHUB_ACCESS_TOKEN"):
+                    detected_platforms.add(platform)
+                
+            # 从关注作者列表中检测平台，但只有在有相应访问令牌时才添加
+            for author_config in self.config.get_followed_authors():
+                platform = author_config.get("PLATFORM", "gitee")
+                if platform == "gitee" and self.config.get("ACCESS_TOKEN"):
+                    detected_platforms.add(platform)
+                elif platform == "github" and self.config.get("GITHUB_ACCESS_TOKEN"):
+                    detected_platforms.add(platform)
+                
+            # 如果没有检测到任何平台，默认添加gitee（如果有令牌）
+            if not detected_platforms and self.config.get("ACCESS_TOKEN"):
+                detected_platforms.add("gitee")
+                
+            self.platforms = list(detected_platforms)
+            logger.info(f"自动检测到需要的平台: {self.platforms}")
+        else:
+            self.platforms = platforms
+        
+        # 创建多个API客户端，支持不同平台
+        self.api_clients: Dict[str, BaseAPIClient] = {}
+        
+        for platform in self.platforms:
+            # 根据平台获取相应的配置
+            if platform == 'gitee':
+                api_url = self.config.get("GITEA_URL")
+                access_token = self.config.get("ACCESS_TOKEN")
+            elif platform == 'github':
+                api_url = self.config.get("GITHUB_URL", "https://api.github.com")
+                access_token = self.config.get("GITHUB_ACCESS_TOKEN")
+            else:
+                logger.warning(f"不支持的平台: {platform}")
+                continue
+                
+            # 检查是否有必要的配置
+            if not access_token:
+                logger.warning(f"跳过创建{platform}API客户端: 缺少访问令牌")
+                continue
+                
+            logger.info(f"正在创建{platform}API客户端: api_url={api_url}, has_token={bool(access_token)}")
+            client = APIClientFactory.create_client(platform, api_url, access_token)
+            
+            if client is None:
+                logger.error(f"创建{platform}API客户端失败")
+            else:
+                logger.info(f"{platform}API客户端创建成功: {type(client)}")
+                self.api_clients[platform] = client
+        
         self.cache = PRCache(ttl=self.config.get("CACHE_TTL", 300))
-        self.pr_labels: Dict[str, Set[str]] = {}  # 保存每个 PR 的最新标签，key格式为 "owner/repo#pr_id"
+        self.pr_labels: Dict[str, Set[str]] = {}  # 保存每个 PR 的最新标签，key格式为 "platform:owner/repo#pr_id"
         self.running = False
         self.poll_thread = None
+        
+    def _get_api_client(self, platform: str) -> Optional[BaseAPIClient]:
+        """
+        根据平台获取相应的API客户端
+        
+        Args:
+            platform: 平台名称
+            
+        Returns:
+            API客户端实例或None
+        """
+        return self.api_clients.get(platform)
         
     def start(self) -> None:
         """启动 PR 监控服务"""
@@ -102,20 +178,21 @@ class PRMonitor:
             self.poll_thread.join(timeout=1.0)
         logger.info("PR 监控服务已停止")
     
-    def get_pr_details(self, owner: str, repo: str, pr_id: int, force_refresh: bool = False) -> Optional[Dict[str, Any]]:
+    def get_pr_details(self, platform: str, owner: str, repo: str, pr_id: int, force_refresh: bool = False) -> Optional[PullRequest]:
         """
         获取 PR 的详细信息，优先使用缓存
         
         Args:
+            platform: 平台名称（gitee, github等）
             owner: 仓库拥有者
             repo: 仓库名称
             pr_id: PR ID
             force_refresh: 是否强制刷新缓存
             
         Returns:
-            PR 详细信息
+            PR 详细信息对象
         """
-        cache_key = f"{owner}/{repo}#{pr_id}_details"
+        cache_key = f"{platform}:{owner}/{repo}#{pr_id}_details"
         
         if force_refresh:
             self.cache.invalidate(cache_key)
@@ -123,26 +200,26 @@ class PRMonitor:
         # 检查缓存
         cached_data = self.cache.get(cache_key)
         if cached_data:
-            return cached_data
+            return PullRequest.from_dict(cached_data)
             
-        # 缓存不存在，从 API 获取
-        access_token = self.config.get("ACCESS_TOKEN")
-        
-        if not access_token:
-            logger.warning("无法获取 PR 详情：ACCESS_TOKEN 未配置")
+        # 获取对应平台的API客户端
+        api_client = self._get_api_client(platform)
+        if not api_client:
+            logger.warning(f"无法获取 {platform} API客户端")
             return None
             
-        pr_details = self.api_client.get_pr_details(owner, repo, pr_id)
-        if pr_details:
-            self.cache.set(cache_key, pr_details)
-            return pr_details
+        pr_data = api_client.get_pr_details(owner, repo, pr_id)
+        if pr_data:
+            self.cache.set(cache_key, pr_data)
+            return PullRequest.from_dict(pr_data)
         return None
     
-    def get_pr_labels(self, owner: str, repo: str, pr_id: int, force_refresh: bool = False) -> List[Dict[str, Any]]:
+    def get_pr_labels(self, platform: str, owner: str, repo: str, pr_id: int, force_refresh: bool = False) -> List[Dict[str, Any]]:
         """
         获取 PR 的标签，优先使用缓存
         
         Args:
+            platform: 平台名称（gitee, github等）
             owner: 仓库拥有者
             repo: 仓库名称
             pr_id: PR ID
@@ -151,7 +228,7 @@ class PRMonitor:
         Returns:
             PR 标签列表
         """
-        cache_key = f"{owner}/{repo}#{pr_id}"
+        cache_key = f"{platform}:{owner}/{repo}#{pr_id}"
         
         if force_refresh:
             self.cache.invalidate(cache_key)
@@ -161,20 +238,19 @@ class PRMonitor:
         if cached_data:
             return cached_data
             
-        # 缓存不存在，从 API 获取
-        access_token = self.config.get("ACCESS_TOKEN")
-        
-        if not access_token:
-            logger.warning("无法获取 PR 标签：ACCESS_TOKEN 未配置")
+        # 获取对应平台的API客户端
+        api_client = self._get_api_client(platform)
+        if not api_client:
+            logger.warning(f"无法获取 {platform} API客户端")
             return []
             
-        labels = self.api_client.get_pr_labels(owner, repo, pr_id)
+        labels = api_client.get_pr_labels(owner, repo, pr_id)
         if labels:
             self.cache.set(cache_key, labels)
             return labels
         return []
     
-    def get_all_pr_labels(self, force_refresh: bool = False) -> Dict[str, List[Dict[str, Any]]]:
+    def get_all_pr_labels(self, force_refresh: bool = False) -> Dict[str, List[str]]:
         """
         获取所有监控的 PR 的标签
         
@@ -182,21 +258,23 @@ class PRMonitor:
             force_refresh: 是否强制刷新缓存
             
         Returns:
-            PR key 到标签列表的映射，key格式为 "owner/repo#pr_id"
+            PR key 到标签名称列表的映射，key格式为 "platform:owner/repo#pr_id"
         """
         result = {}
         for pr_config in self.config.get_pr_lists():
+            platform = pr_config.get("PLATFORM", "gitee")  # 默认为gitee
             owner = pr_config.get("OWNER")
             repo = pr_config.get("REPO")
             pr_id = pr_config.get("PULL_REQUEST_ID")
             
             if owner and repo and pr_id:
-                cache_key = f"{owner}/{repo}#{pr_id}"
-                result[cache_key] = self.get_pr_labels(owner, repo, pr_id, force_refresh)
+                cache_key = f"{platform}:{owner}/{repo}#{pr_id}"
+                labels = self.get_pr_labels(platform, owner, repo, pr_id, force_refresh)
+                result[cache_key] = [label.get("name", "") for label in labels]
                 
         return result
         
-    def get_followed_author_prs(self, force_refresh: bool = False, auto_add_to_monitor: bool = True) -> List[Dict[str, Any]]:
+    def get_followed_author_prs(self, force_refresh: bool = False, auto_add_to_monitor: bool = True) -> List[PullRequest]:
         """
         获取所有关注作者的PR列表，并可选择自动将其添加到监控列表中
         
@@ -205,16 +283,17 @@ class PRMonitor:
             auto_add_to_monitor: 是否自动将关注作者的PR添加到监控列表中
             
         Returns:
-            所有关注作者的PR列表
+            所有关注作者的PR对象列表
         """
         all_prs = []
         for author_config in self.config.get_followed_authors():
             author = author_config.get("AUTHOR")
             repo_full = author_config.get("REPO")
+            platform = author_config.get("PLATFORM", "gitee")  # 默认为gitee
             
             if author and repo_full and "/" in repo_full:
                 owner, repo = repo_full.split("/", 1)
-                cache_key = f"{author}@{repo_full}"
+                cache_key = f"{platform}:{author}@{repo_full}"
                 
                 if force_refresh:
                     self.cache.invalidate(cache_key)
@@ -222,42 +301,41 @@ class PRMonitor:
                 # 检查缓存
                 cached_data = self.cache.get(cache_key)
                 if cached_data:
-                    prs = cached_data
+                    prs_data = cached_data
                 else:
-                    # 缓存不存在，从 API 获取
-                    access_token = self.config.get("ACCESS_TOKEN")
-                    
-                    if not access_token:
-                        logger.warning(f"无法获取作者 {author} 的PR列表：ACCESS_TOKEN 未配置")
+                    # 获取对应平台的API客户端
+                    api_client = self._get_api_client(platform)
+                    if not api_client:
+                        logger.warning(f"无法获取 {platform} API客户端")
                         continue
                     
-                    prs = self.api_client.get_author_prs(owner, repo, author)
-                    if prs:
-                        self.cache.set(cache_key, prs)
+                    prs_data = api_client.get_author_prs(owner, repo, author)
+                    if prs_data:
+                        self.cache.set(cache_key, prs_data)
                     else:
-                        prs = []
+                        prs_data = []
                 
-                # 将PR添加到结果列表
-                all_prs.extend(prs)
-                
-                # 自动将PR添加到监控列表
-                if auto_add_to_monitor and prs:
-                    for pr in prs:
-                        pr_id = pr.get("number")
-                        if pr_id:
-                            # 检查PR是否已在监控列表中
-                            is_monitored = False
-                            for pr_config in self.config.get_pr_lists():
-                                if (pr_config.get("OWNER") == owner and 
-                                    pr_config.get("REPO") == repo and 
-                                    pr_config.get("PULL_REQUEST_ID") == pr_id):
-                                    is_monitored = True
-                                    break
-                            
-                            # 如果不在监控列表中，则添加
-                            if not is_monitored:
-                                self.config.add_pr(owner, repo, pr_id)
-                                logger.info(f"自动添加关注作者 {author} 的 PR #{pr_id} ({owner}/{repo}) 到监控列表")
+                # 将PR数据转换为PullRequest对象
+                for pr_data in prs_data:
+                    pr = PullRequest.from_dict(pr_data)
+                    all_prs.append(pr)
+                    
+                    # 自动将PR添加到监控列表
+                    if auto_add_to_monitor:
+                        # 检查PR是否已在监控列表中
+                        is_monitored = False
+                        for pr_config in self.config.get_pr_lists():
+                            if (pr_config.get("PLATFORM", "gitee") == platform and
+                                pr_config.get("OWNER") == owner and 
+                                pr_config.get("REPO") == repo and 
+                                pr_config.get("PULL_REQUEST_ID") == pr.number):
+                                is_monitored = True
+                                break
+                        
+                        # 如果不在监控列表中，则添加
+                        if not is_monitored:
+                            self.config.add_pr(owner, repo, pr.number, platform)
+                            logger.info(f"自动添加关注作者 {author} 的 {platform} PR #{pr.number} ({owner}/{repo}) 到监控列表")
                 
         # 保存配置以保存自动添加的PR
         if auto_add_to_monitor and all_prs:
@@ -278,26 +356,28 @@ class PRMonitor:
     def _check_all_prs(self) -> None:
         """检查所有监控的 PR 的标签变化"""
         for pr_config in self.config.get_pr_lists():
+            platform = pr_config.get("PLATFORM", "gitee")  # 默认为gitee
             owner = pr_config.get("OWNER")
             repo = pr_config.get("REPO")
             pr_id = pr_config.get("PULL_REQUEST_ID")
             
             if owner and repo and pr_id:
-                self._check_pr(owner, repo, pr_id)
+                self._check_pr(platform, owner, repo, pr_id)
     
-    def _check_pr(self, owner: str, repo: str, pr_id: int) -> None:
+    def _check_pr(self, platform: str, owner: str, repo: str, pr_id: int) -> None:
         """
         检查单个 PR 的标签变化
         
         Args:
+            platform: 平台名称
             owner: 仓库拥有者
             repo: 仓库名称
             pr_id: PR ID
         """
-        labels = self.get_pr_labels(owner, repo, pr_id, force_refresh=True)
+        labels = self.get_pr_labels(platform, owner, repo, pr_id, force_refresh=True)
         label_names = {label.get("name", "") for label in labels}
         
-        cache_key = f"{owner}/{repo}#{pr_id}"
+        cache_key = f"{platform}:{owner}/{repo}#{pr_id}"
         
         # 检查标签变化
         if cache_key in self.pr_labels:
@@ -305,16 +385,17 @@ class PRMonitor:
             if old_labels != label_names:
                 added = label_names - old_labels
                 removed = old_labels - label_names
-                self._notify_label_change(owner, repo, pr_id, added, removed)
+                self._notify_label_change(platform, owner, repo, pr_id, added, removed)
         
         # 更新保存的标签
         self.pr_labels[cache_key] = label_names
     
-    def _notify_label_change(self, owner: str, repo: str, pr_id: int, added: Set[str], removed: Set[str]) -> None:
+    def _notify_label_change(self, platform: str, owner: str, repo: str, pr_id: int, added: Set[str], removed: Set[str]) -> None:
         """
         处理标签变化通知
         
         Args:
+            platform: 平台名称
             owner: 仓库拥有者
             repo: 仓库名称
             pr_id: PR ID
@@ -330,7 +411,7 @@ class PRMonitor:
         if removed:
             change_str.append(f"移除标签: {', '.join(removed)}")
             
-        message = f"PR #{pr_id} ({owner}/{repo}) 标签变化: {' '.join(change_str)}"
+        message = f"{platform.upper()} PR #{pr_id} ({owner}/{repo}) 标签变化: {' '.join(change_str)}"
         logger.info(message)
         
         # TODO: 实现实际的通知功能，如邮件、Webhook 等

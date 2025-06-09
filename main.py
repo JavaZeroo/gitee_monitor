@@ -9,9 +9,11 @@ import threading
 import argparse
 
 from gitee_monitor.config.config_manager import Config
-from gitee_monitor.api.gitee_api import GiteeAPIClient
 from gitee_monitor.services.pr_monitor import PRMonitor
 from gitee_monitor.web.webapp import WebApp
+
+# 确保API客户端已注册（通过导入模块触发注册）
+from gitee_monitor.api import gitee_api, github_api
 
 # 默认配置文件路径
 DEFAULT_CONFIG_FILE = "config.json"
@@ -70,19 +72,11 @@ def main():
     # 设置日志
     log_level = getattr(logging, args.log_level)
     logger = setup_logging(log_level)
-    logger.info("Gitee PR Monitor 启动中...")
-    
-    # 初始化配置
+    logger.info("Gitee PR Monitor 启动中...")    # 初始化配置
     config = Config(args.config)
     
-    # 初始化 API 客户端
-    api_client = GiteeAPIClient(
-        api_url=config.get("GITEA_URL"),
-        access_token=config.get("ACCESS_TOKEN")
-    )
-    
-    # 初始化 PR 监控服务
-    pr_monitor = PRMonitor(config, api_client)
+    # 初始化 PR 监控服务（自动检测需要的平台）
+    pr_monitor = PRMonitor(config)
     
     # 启动 PR 监控服务
     pr_monitor.start()

@@ -14,6 +14,7 @@ class Config:
     DEFAULT_CONFIG = {
         "GITEA_URL": "https://gitee.com/api/v5",
         "ACCESS_TOKEN": "",
+        "GITHUB_ACCESS_TOKEN": "",
         "PULL_REQUEST_LISTS": [],  # PR监控列表，每个元素包含OWNER、REPO、PULL_REQUEST_ID
         "FOLLOWED_AUTHORS": [],  # 关注的PR创建者列表，每个元素包含AUTHOR、REPO
         "CACHE_TTL": 300,  # 缓存生存时间（秒）
@@ -118,7 +119,7 @@ class Config:
             if key in self.config:
                 self.config[key] = value
     
-    def add_pr(self, owner: str, repo: str, pr_id: int) -> None:
+    def add_pr(self, owner: str, repo: str, pr_id: int, platform: str = "gitee") -> None:
         """
         添加 PR 到监控列表
         
@@ -126,27 +127,30 @@ class Config:
             owner: 仓库拥有者
             repo: 仓库名称
             pr_id: PR ID
+            platform: 平台名称（默认为gitee）
         """
         pr_lists = self.config.get("PULL_REQUEST_LISTS", [])
         
         # 检查是否已存在相同的PR
         for existing_pr in pr_lists:
-            if (existing_pr.get("OWNER") == owner and 
+            if (existing_pr.get("PLATFORM", "gitee") == platform and
+                existing_pr.get("OWNER") == owner and 
                 existing_pr.get("REPO") == repo and 
                 existing_pr.get("PULL_REQUEST_ID") == pr_id):
-                logger.warning(f"PR #{pr_id} ({owner}/{repo}) 已存在于监控列表中")
+                logger.warning(f"{platform.upper()} PR #{pr_id} ({owner}/{repo}) 已存在于监控列表中")
                 return
         
         # 添加新PR
         pr_lists.append({
+            "PLATFORM": platform,
             "OWNER": owner,
             "REPO": repo,
             "PULL_REQUEST_ID": pr_id
         })
         self.config["PULL_REQUEST_LISTS"] = pr_lists
-        logger.info(f"添加 PR #{pr_id} ({owner}/{repo}) 到监控列表")
+        logger.info(f"添加 {platform.upper()} PR #{pr_id} ({owner}/{repo}) 到监控列表")
     
-    def remove_pr(self, owner: str, repo: str, pr_id: int) -> None:
+    def remove_pr(self, owner: str, repo: str, pr_id: int, platform: str = "gitee") -> None:
         """
         从监控列表中移除 PR
         
@@ -154,19 +158,21 @@ class Config:
             owner: 仓库拥有者
             repo: 仓库名称
             pr_id: PR ID
+            platform: 平台名称（默认为gitee）
         """
         pr_lists = self.config.get("PULL_REQUEST_LISTS", [])
         
         for i, existing_pr in enumerate(pr_lists):
-            if (existing_pr.get("OWNER") == owner and 
+            if (existing_pr.get("PLATFORM", "gitee") == platform and
+                existing_pr.get("OWNER") == owner and 
                 existing_pr.get("REPO") == repo and 
                 existing_pr.get("PULL_REQUEST_ID") == pr_id):
                 pr_lists.pop(i)
                 self.config["PULL_REQUEST_LISTS"] = pr_lists
-                logger.info(f"从监控列表中移除 PR #{pr_id} ({owner}/{repo})")
+                logger.info(f"从监控列表中移除 {platform.upper()} PR #{pr_id} ({owner}/{repo})")
                 return
         
-        logger.warning(f"未找到要移除的 PR #{pr_id} ({owner}/{repo})")
+        logger.warning(f"未找到要移除的 {platform.upper()} PR #{pr_id} ({owner}/{repo})")
     
     def get_pr_lists(self) -> List[Dict[str, Any]]:
         """

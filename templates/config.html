@@ -30,17 +30,56 @@
             <div class="card-body">
                 <h2 class="card-title">API 配置</h2>
                 <form id="api-config-form">
-                    <div class="mb-3">
-                        <label for="access_token" class="form-label">Gitee 访问令牌 (Access Token):</label>
-                        <input type="password" class="form-control" id="access_token" name="access_token"
-                            value="{{ config.get('ACCESS_TOKEN', '') }}" placeholder="输入 Access Token">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-git me-2" viewBox="0 0 16 16">
+                                            <path d="M15.698 7.287 8.712.302a1.03 1.03 0 0 0-1.457 0l-1.45 1.45 1.84 1.84a1.223 1.223 0 0 1 1.55 1.56l1.773 1.774a1.224 1.224 0 0 1 1.267 2.025 1.226 1.226 0 0 1-2.002-1.334L8.58 5.963v4.353a1.226 1.226 0 1 1-1.008-.036V5.887a1.226 1.226 0 0 1-.666-1.608L5.093 2.465l-4.79 4.79a1.03 1.03 0 0 0 0 1.457l6.986 6.986a1.03 1.03 0 0 0 1.457 0l6.953-6.953a1.031 1.031 0 0 0 0-1.457"/>
+                                        </svg>
+                                        Gitee 配置
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="gitee_access_token" class="form-label">Gitee 访问令牌:</label>
+                                        <input type="password" class="form-control" id="gitee_access_token" name="gitee_access_token"
+                                            value="{{ config.get('ACCESS_TOKEN', '') }}" placeholder="输入 Gitee Access Token">
+                                        <div class="form-text">用于访问 Gitee API 的访问令牌</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header bg-dark text-white">
+                                    <h5 class="mb-0">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-github me-2" viewBox="0 0 16 16">
+                                            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+                                        </svg>
+                                        GitHub 配置
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="github_access_token" class="form-label">GitHub 访问令牌:</label>
+                                        <input type="password" class="form-control" id="github_access_token" name="github_access_token"
+                                            value="{{ config.get('GITHUB_ACCESS_TOKEN', '') }}" placeholder="输入 GitHub Access Token">
+                                        <div class="form-text">用于访问 GitHub API 的访问令牌 (可选)</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <button type="submit" class="btn btn-primary">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-save me-1" viewBox="0 0 16 16">
-                            <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H9.5a1 1 0 0 0-1 1v7.293l2.646-2.647a.5.5 0 0 1 .708.708l-3.5 3.5a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L7.5 9.293V2a2 2 0 0 1 2-2H14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2.5a.5.5 0 0 1 0 1H2z"/>
-                        </svg>
-                        保存 API 配置
-                    </button>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-save me-1" viewBox="0 0 16 16">
+                                <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H9.5a1 1 0 0 0-1 1v7.293l2.646-2.647a.5.5 0 0 1 .708.708l-3.5 3.5a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L7.5 9.293V2a2 2 0 0 1 2-2H14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2.5a.5.5 0 0 1 0 1H2z"/>
+                            </svg>
+                            保存 API 配置
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
@@ -53,29 +92,37 @@
                 <form action="{{ url_for('config_page') }}" method="post" class="mb-4">
                     <input type="hidden" name="action" value="add_followed_author">
                     <div class="row g-3">
-                        <div class="col-md-4">
-                            <input type="text" class="form-control" name="author" placeholder="作者用户名" required>
-                        </div>
-                        <div class="col-md-5">
-                            <input type="text" class="form-control" name="repo" placeholder="仓库，格式：owner/repo" required>
+                        <div class="col-md-3">
+                            <select class="form-select" name="platform" required>
+                                <option value="">选择平台</option>
+                                <option value="gitee">Gitee</option>
+                                <option value="github">GitHub</option>
+                            </select>
                         </div>
                         <div class="col-md-3">
+                            <input type="text" class="form-control" name="author" placeholder="作者用户名" required>
+                        </div>
+                        <div class="col-md-4">
+                            <input type="text" class="form-control" name="repo" placeholder="仓库，格式：owner/repo" required>
+                        </div>
+                        <div class="col-md-2">
                             <button type="submit" class="btn btn-success w-100">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-plus me-1" viewBox="0 0 16 16">
                                     <path d="M6 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H1s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C9.516 10.68 8.289 10 6 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
                                     <path fill-rule="evenodd" d="M13.5 5a.5.5 0 0 1 .5.5V7h1.5a.5.5 0 0 1 0 1H14v1.5a.5.5 0 0 1-1 0V8h-1.5a.5.5 0 0 1 0-1H13V5.5a.5.5 0 0 1 .5-.5z"/>
                                 </svg>
-                                添加关注
+                                添加
                             </button>
                         </div>
                     </div>
-                    <small class="form-text text-muted">例如：作者 "jimmyisme"，仓库 "mindspore/mindformers"</small>
+                    <small class="form-text text-muted">例如：平台 "gitee"，作者 "jimmyisme"，仓库 "mindspore/mindformers"</small>
                 </form>
                 
                 <div class="table-responsive">
                     <table class="table table-hover author-table">
                         <thead>
                             <tr>
+                                <th scope="col" class="platform-name">平台</th>
                                 <th scope="col" class="author-name">作者</th>
                                 <th scope="col" class="repo-name">仓库</th>
                                 <th scope="col" class="author-actions">操作</th>
@@ -84,12 +131,30 @@
                         <tbody>
                             {% for author_config in config.get_followed_authors() %}
                             <tr>
+                                <td class="platform-name">
+                                    {% if author_config.PLATFORM == 'github' %}
+                                        <span class="badge bg-dark">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-github me-1" viewBox="0 0 16 16">
+                                                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+                                            </svg>
+                                            GitHub
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-primary">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-git me-1" viewBox="0 0 16 16">
+                                                <path d="M15.698 7.287 8.712.302a1.03 1.03 0 0 0-1.457 0l-1.45 1.45 1.84 1.84a1.223 1.223 0 0 1 1.55 1.56l1.773 1.774a1.224 1.224 0 0 1 1.267 2.025 1.226 1.226 0 0 1-2.002-1.334L8.58 5.963v4.353a1.226 1.226 0 1 1-1.008-.036V5.887a1.226 1.226 0 0 1-.666-1.608L5.093 2.465l-4.79 4.79a1.03 1.03 0 0 0 0 1.457l6.986 6.986a1.03 1.03 0 0 0 1.457 0l6.953-6.953a1.031 1.031 0 0 0 0-1.457"/>
+                                            </svg>
+                                            Gitee
+                                        </span>
+                                    {% endif %}
+                                </td>
                                 <td class="author-name">{{ author_config.AUTHOR }}</td>
                                 <td class="repo-name">{{ author_config.REPO }}</td>
                                 <td class="author-actions">
                                     <button class="btn btn-danger btn-sm delete-author-btn"
                                         data-author="{{ author_config.AUTHOR }}"
-                                        data-repo="{{ author_config.REPO }}">
+                                        data-repo="{{ author_config.REPO }}"
+                                        data-platform="{{ author_config.PLATFORM }}">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
                                             <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
                                             <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
@@ -99,7 +164,7 @@
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="3" class="text-center">暂无关注的作者</td>
+                                <td colspan="4" class="text-center">暂无关注的作者</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -139,9 +204,11 @@
         document.getElementById('api-config-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const accessToken = document.getElementById('access_token').value.trim();
-            if (!accessToken) {
-                showMessage('ACCESS_TOKEN 是必填的！', 'danger');
+            const giteeAccessToken = document.getElementById('gitee_access_token').value.trim();
+            const githubAccessToken = document.getElementById('github_access_token').value.trim();
+            
+            if (!giteeAccessToken && !githubAccessToken) {
+                showMessage('至少需要配置一个平台的访问令牌！', 'danger');
                 return;
             }
             
@@ -151,7 +218,10 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ access_token: accessToken })
+                    body: JSON.stringify({ 
+                        gitee_access_token: giteeAccessToken,
+                        github_access_token: githubAccessToken
+                    })
                 });
                 
                 const result = await response.json();
@@ -173,8 +243,9 @@
                 
                 const author = e.target.dataset.author;
                 const repo = e.target.dataset.repo;
+                const platform = e.target.dataset.platform;
                 
-                if (!confirm(`确定要删除对 ${author} 在 ${repo} 的关注吗？`)) {
+                if (!confirm(`确定要删除对 ${author} 在 ${platform}/${repo} 的关注吗？`)) {
                     return;
                 }
                 
@@ -186,7 +257,8 @@
                         },
                         body: JSON.stringify({ 
                             author: author, 
-                            repo: repo
+                            repo: repo,
+                            platform: platform
                         })
                     });
                     

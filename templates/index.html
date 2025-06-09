@@ -5,7 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PR 监控</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Noto+Sans+SC:wght@300;400;            actionCell.innerHTML = `<button class="btn btn-danger btn-sm delete-pr-btn" 
+                    data-platform="${prData.platform || 'gitee'}"
+                    data-owner="${prData.owner}" 
+                    data-repo="${prData.repo}" 
+                    data-pr-id="${prData.pr_id}">`700&display=swap" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/material.css') }}" rel="stylesheet">
 </head>
@@ -21,7 +25,7 @@
                 <form id="add-pr-form" class="row g-3">
                     <div class="col-md-9">
                         <input type="url" class="form-control" id="pr_url" name="pr_url"
-                            placeholder="输入 PR 链接，如：https://gitee.com/owner/repo/pulls/1234">
+                            placeholder="输入 PR 链接，如：https://gitee.com/owner/repo/pulls/1234 或 https://github.com/owner/repo/pull/1234">
                     </div>
                     <div class="col-md-3">
                     <button type="submit" class="btn btn-success w-100">
@@ -33,7 +37,7 @@
                     </button>
                 </div>
                 </form>
-                <div class="form-text mt-2">支持格式：https://gitee.com/{owner}/{repo}/pulls/{pr_id}</div>
+                <div class="form-text mt-2">支持格式：https://gitee.com/{owner}/{repo}/pulls/{pr_id} 或 https://github.com/{owner}/{repo}/pull/{pr_id}</div>
             </div>
         </div>
         
@@ -87,6 +91,7 @@
                     <table class="table table-hover mb-0">
                         <thead>
                             <tr>
+                                <th scope="col" class="platform-name">平台</th>
                                 <th scope="col" class="repo-name">仓库</th>
                                 <th scope="col" class="pr-number">PR 编号</th>
                                 <th scope="col" class="pr-name">PR 名称</th>
@@ -173,9 +178,33 @@
         function addPRToTable(prData) {
             const tbody = document.getElementById('pr-table-body');
             const row = document.createElement('tr');
+            row.setAttribute('data-platform', prData.platform || 'gitee');
             row.setAttribute('data-owner', prData.owner);
             row.setAttribute('data-repo', prData.repo);
             row.setAttribute('data-pr-id', prData.pr_id);
+            
+            // 平台列
+            const platformCell = document.createElement('td');
+            const platform = prData.platform || 'gitee';
+            if (platform === 'github') {
+                platformCell.innerHTML = `
+                    <span class="badge bg-dark">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-github me-1" viewBox="0 0 16 16">
+                            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+                        </svg>
+                        GitHub
+                    </span>
+                `;
+            } else {
+                platformCell.innerHTML = `
+                    <span class="badge bg-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-git me-1" viewBox="0 0 16 16">
+                            <path d="M15.698 7.287 8.712.302a1.03 1.03 0 0 0-1.457 0l-1.45 1.45 1.84 1.84a1.223 1.223 0 0 1 1.55 1.56l1.773 1.774a1.224 1.224 0 0 1 1.267 2.025 1.226 1.226 0 0 1-2.002-1.334L8.58 5.963v4.353a1.226 1.226 0 1 1-1.008-.036V5.887a1.226 1.226 0 0 1-.666-1.608L5.093 2.465l-4.79 4.79a1.03 1.03 0 0 0 0 1.457l6.986 6.986a1.03 1.03 0 0 0 1.457 0l6.953-6.953a1.031 1.031 0 0 0 0-1.457"/>
+                        </svg>
+                        Gitee
+                    </span>
+                `;
+            }
             
             // 仓库列
             const repoCell = document.createElement('td');
@@ -272,6 +301,7 @@
                     </svg>
                 </button>`;
             
+            row.appendChild(platformCell);
             row.appendChild(repoCell);
             row.appendChild(prIdCell);
             row.appendChild(titleCell);
@@ -397,11 +427,12 @@
         // 处理删除PR事件
         async function handleDeletePR(event) {
             const deleteBtn = event.currentTarget;
+            const platform = deleteBtn.getAttribute('data-platform') || 'gitee';  // 从按钮获取平台信息，默认为gitee
             const owner = deleteBtn.getAttribute('data-owner');
             const repo = deleteBtn.getAttribute('data-repo');
             const prId = deleteBtn.getAttribute('data-pr-id');
             
-            if (confirm(`确定要删除监控 ${owner}/${repo} 的 PR #${prId} 吗？`)) {
+            if (confirm(`确定要删除监控 ${platform.toUpperCase()}/${owner}/${repo} 的 PR #${prId} 吗？`)) {
                 try {
                     const response = await fetch('/api/delete_pr', {
                         method: 'DELETE',
@@ -409,6 +440,7 @@
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({ 
+                            platform: platform,
                             owner: owner, 
                             repo: repo, 
                             pr_id: prId 

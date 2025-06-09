@@ -73,33 +73,35 @@ class WebApp:
                             self.config.save_config()
                             logger.info(f"通过 URL 添加 PR #{pr_id} ({owner}/{repo}) 到监控列表")
                 elif action == 'add_followed_author':
+                    platform = request.form.get('platform', '').strip()
                     author = request.form.get('author', '').strip()
                     repo = request.form.get('repo', '').strip()
                     
-                    if not author or not repo:
-                        error = '作者和仓库都是必填的！'
+                    if not platform or not author or not repo:
+                        error = '平台、作者和仓库都是必填的！'
                     else:
                         # 验证仓库格式
                         if '/' not in repo:
                             error = '仓库格式不正确，应为 owner/repo 格式'
                         else:
-                            self.config.add_followed_author(author, repo)
+                            self.config.add_followed_author(author, repo, platform)
                             self.config.save_config()
-                            logger.info(f"通过表单添加关注作者 {author} 的仓库 {repo}")
+                            logger.info(f"通过表单添加关注作者 {author} 的仓库 {repo} (平台: {platform})")
                 if error:
                     return render_template('config.html', config=self.config, error=error)
                 return redirect(url_for('config_page'))
             
             if request.args.get('action') == 'delete_pr':
+                platform = request.args.get('platform', 'gitee')  # 默认为gitee
                 owner = request.args.get('owner')
                 repo = request.args.get('repo')
                 pr_id = request.args.get('pr_id')
                 
                 if owner and repo and pr_id and pr_id.isdigit():
                     pr_id = int(pr_id)
-                    self.config.remove_pr(owner, repo, pr_id)
+                    self.config.remove_pr(owner, repo, pr_id, platform)
                     self.config.save_config()
-                    logger.info(f"删除 PR #{pr_id} ({owner}/{repo}) 从监控列表")
+                    logger.info(f"删除 {platform.upper()} PR #{pr_id} ({owner}/{repo}) 从监控列表")
                 return redirect(url_for('config_page'))
                 
             if request.args.get('action') == 'delete_followed_author':
@@ -167,7 +169,7 @@ class WebApp:
                         "owner": owner,
                         "repo": repo,
                         "pr_id": pr_id,
-                        "pr_details": pr_details  # 包含提交人、分支等详细信息
+                        "pr_details": pr_details.to_dict() if pr_details else None  # 使用PullRequest对象的to_dict方法
                     }
             return jsonify(pr_data)
         
@@ -185,23 +187,25 @@ class WebApp:
                 yield f"event: start\ndata: {json.dumps({'total': total_prs})}\n\n"
                 
                 for pr_config in pr_configs:
+                    platform = pr_config.get("PLATFORM", "gitee")  # 默认为gitee
                     owner = pr_config.get("OWNER")
                     repo = pr_config.get("REPO")
                     pr_id = pr_config.get("PULL_REQUEST_ID")
                     
                     if owner and repo and pr_id:
                         try:
-                            cache_key = f"{owner}/{repo}#{pr_id}"
-                            labels = self.pr_monitor.get_pr_labels(owner, repo, pr_id, force_refresh=force_refresh)
-                            pr_details = self.pr_monitor.get_pr_details(owner, repo, pr_id, force_refresh=force_refresh)
+                            cache_key = f"{platform}:{owner}/{repo}#{pr_id}"
+                            labels = self.pr_monitor.get_pr_labels(platform, owner, repo, pr_id, force_refresh=force_refresh)
+                            pr_details = self.pr_monitor.get_pr_details(platform, owner, repo, pr_id, force_refresh=force_refresh)
                             
                             pr_data = {
                                 "cache_key": cache_key,
+                                "platform": platform,
                                 "current_labels": labels,
                                 "owner": owner,
                                 "repo": repo,
                                 "pr_id": pr_id,
-                                "pr_details": pr_details
+                                "pr_details": pr_details.to_dict() if pr_details else None
                             }
                             
                             # 发送PR数据事件
@@ -210,14 +214,15 @@ class WebApp:
                         except Exception as e:
                             # 发送错误事件
                             error_data = {
-                                "cache_key": f"{owner}/{repo}#{pr_id}",
+                                "cache_key": f"{platform}:{owner}/{repo}#{pr_id}",
+                                "platform": platform,
                                 "error": str(e),
                                 "owner": owner,
                                 "repo": repo,
                                 "pr_id": pr_id
                             }
                             yield f"event: pr_error\ndata: {json.dumps(error_data)}\n\n"
-                            logger.error(f"获取PR数据失败 {owner}/{repo}#{pr_id}: {e}")
+                            logger.error(f"获取{platform.upper()}PR数据失败 {owner}/{repo}#{pr_id}: {e}")
                     
                     processed += 1
                     # 发送进度事件
@@ -247,40 +252,61 @@ class WebApp:
             if not pr_url:
                 return jsonify({'success': False, 'error': '请输入有效的 PR URL！'}), 400
             
-            # 使用正则表达式解析 PR URL
-            pattern = r'https://gitee\.com/([^/]+)/([^/]+)/pulls/(\d+)'
-            match = re.match(pattern, pr_url)
+            # 解析不同平台的 PR URL
+            platform = None
+            owner = None
+            repo = None
+            pr_id = None
             
-            if not match:
-                return jsonify({'success': False, 'error': 'URL 格式不正确！请使用格式：https://gitee.com/{owner}/{repo}/pulls/{pr_id}'}), 400
+            # Gitee URL 格式: https://gitee.com/{owner}/{repo}/pulls/{pr_id}
+            gitee_pattern = r'https://gitee\.com/([^/]+)/([^/]+)/pulls/(\d+)'
+            gitee_match = re.match(gitee_pattern, pr_url)
             
-            owner = match.group(1)
-            repo = match.group(2)
-            pr_id = int(match.group(3))
+            # GitHub URL 格式: https://github.com/{owner}/{repo}/pull/{pr_id}
+            github_pattern = r'https://github\.com/([^/]+)/([^/]+)/pull/(\d+)'
+            github_match = re.match(github_pattern, pr_url)
             
-            self.config.add_pr(owner, repo, pr_id)
+            if gitee_match:
+                platform = "gitee"
+                owner = gitee_match.group(1)
+                repo = gitee_match.group(2)
+                pr_id = int(gitee_match.group(3))
+            elif github_match:
+                platform = "github"
+                owner = github_match.group(1)
+                repo = github_match.group(2)
+                pr_id = int(github_match.group(3))
+            else:
+                return jsonify({
+                    'success': False, 
+                    'error': 'URL 格式不正确！支持的格式：\n- Gitee: https://gitee.com/{owner}/{repo}/pulls/{pr_id}\n- GitHub: https://github.com/{owner}/{repo}/pull/{pr_id}'
+                }), 400
+            
+            self.config.add_pr(owner, repo, pr_id, platform)
             self.config.save_config()
-            logger.info(f"通过 API 添加 PR #{pr_id} ({owner}/{repo}) 到监控列表")
+            logger.info(f"通过 API 添加 {platform.upper()} PR #{pr_id} ({owner}/{repo}) 到监控列表")
             
             # 获取新添加PR的标签信息
             try:
-                labels = self.pr_monitor.get_pr_labels(owner, repo, pr_id)
-                pr_details = self.pr_monitor.get_pr_details(owner, repo, pr_id)
+                labels = self.pr_monitor.get_pr_labels(platform, owner, repo, pr_id)
+                pr_details = self.pr_monitor.get_pr_details(platform, owner, repo, pr_id)
                 current_labels = labels  # 传递完整的标签对象
             except Exception as e:
-                logger.warning(f"获取新添加PR的信息失败: {e}")
+                logger.warning(f"获取新添加{platform.upper()}PR的信息失败: {e}")
                 current_labels = []
                 pr_details = None
             
             return jsonify({
                 'success': True, 
-                'message': 'PR 添加成功',
+                'message': f'{platform.upper()} PR 添加成功',
                 'pr_data': {
+                    'platform': platform,
                     'owner': owner,
                     'repo': repo,
                     'pr_id': pr_id,
                     'current_labels': current_labels,
-                    'pr_details': pr_details
+                    'pr_details': pr_details.to_dict() if pr_details else None,
+                    'cache_key': f"{platform}:{owner}/{repo}#{pr_id}"
                 }
             })
         
@@ -288,6 +314,7 @@ class WebApp:
         @self.app.route('/api/delete_pr', methods=['DELETE'])
         def api_delete_pr():
             data = request.get_json()
+            platform = data.get('platform', 'gitee')  # 默认为gitee
             owner = data.get('owner')
             repo = data.get('repo')
             pr_id = data.get('pr_id')
@@ -297,10 +324,10 @@ class WebApp:
             
             try:
                 pr_id = int(pr_id)
-                self.config.remove_pr(owner, repo, pr_id)
+                self.config.remove_pr(owner, repo, pr_id, platform)
                 self.config.save_config()
-                logger.info(f"通过 API 删除 PR #{pr_id} ({owner}/{repo}) 从监控列表")
-                return jsonify({'success': True, 'message': 'PR 删除成功'})
+                logger.info(f"通过 API 删除 {platform.upper()} PR #{pr_id} ({owner}/{repo}) 从监控列表")
+                return jsonify({'success': True, 'message': f'{platform.upper()} PR 删除成功'})
             except ValueError:
                 return jsonify({'success': False, 'error': 'PR ID 必须是数字'}), 400
         
@@ -308,16 +335,22 @@ class WebApp:
         @self.app.route('/api/update_api', methods=['POST'])
         def api_update_api():
             data = request.get_json()
-            access_token = data.get('access_token', '').strip()
+            gitee_access_token = data.get('gitee_access_token', '').strip()
+            github_access_token = data.get('github_access_token', '').strip()
             
-            if not access_token:
-                return jsonify({'success': False, 'error': 'ACCESS_TOKEN 是必填的！'}), 400
+            if not gitee_access_token and not github_access_token:
+                return jsonify({'success': False, 'error': '至少需要配置一个平台的访问令牌！'}), 400
             
-            self.config.update({
-                "ACCESS_TOKEN": access_token
-            })
+            # 更新配置
+            config_updates = {}
+            if gitee_access_token:
+                config_updates["ACCESS_TOKEN"] = gitee_access_token
+            if github_access_token:
+                config_updates["GITHUB_ACCESS_TOKEN"] = github_access_token
+                
+            self.config.update(config_updates)
             self.config.save_config()
-            logger.info("通过 API 更新 API 配置")
+            logger.info("通过 API 更新多平台 API 配置")
             
             return jsonify({'success': True, 'message': 'API 配置更新成功'})
             
@@ -327,30 +360,42 @@ class WebApp:
             force_refresh = request.args.get('force_refresh', '').lower() == 'true'
             # 获取关注作者的PR并自动添加到监控列表
             prs = self.pr_monitor.get_followed_author_prs(force_refresh=force_refresh, auto_add_to_monitor=True)
-            return jsonify(prs)
+            # 将PullRequest对象转换为字典格式
+            prs_data = [pr.to_dict() for pr in prs]
+            return jsonify(prs_data)
         
         # 添加关注作者 API 端点
         @self.app.route('/api/add_followed_author', methods=['POST'])
         def api_add_followed_author():
             data = request.get_json()
+            platform = data.get('platform', '').strip()
             author = data.get('author', '').strip()
             repo = data.get('repo', '').strip()
             
-            if not author or not repo:
-                return jsonify({'success': False, 'error': '作者和仓库都是必填的！'}), 400
+            if not platform or not author or not repo:
+                return jsonify({'success': False, 'error': '平台、作者和仓库都是必填的！'}), 400
             
             # 验证仓库格式
             if '/' not in repo:
                 return jsonify({'success': False, 'error': '仓库格式不正确，应为 owner/repo 格式'}), 400
                 
-            self.config.add_followed_author(author, repo)
+            self.config.add_followed_author(author, repo, platform)
             self.config.save_config()
-            logger.info(f"通过 API 添加关注作者 {author} 的仓库 {repo}")
+            logger.info(f"通过 API 添加关注作者 {author} 的仓库 {repo} (平台: {platform})")
             
             # 获取新添加作者的PR列表
             try:
                 owner, repo_name = repo.split('/', 1)
-                prs = self.pr_monitor.api_client.get_author_prs(owner, repo_name, author)
+                # 使用对应平台的API客户端
+                from ..api.api_client_factory import APIClientFactory
+                api_client = APIClientFactory.create_client(platform)
+                if api_client:
+                    prs_data = api_client.get_author_prs(owner, repo_name, author)
+                    prs = []
+                    if prs_data:
+                        prs = [pr_data for pr_data in prs_data]  # 保持原始数据格式
+                else:
+                    prs = []
             except Exception as e:
                 logger.warning(f"获取新添加作者的PR列表失败: {e}")
                 prs = []
@@ -359,6 +404,7 @@ class WebApp:
                 'success': True, 
                 'message': '关注作者添加成功',
                 'author_data': {
+                    'platform': platform,
                     'author': author,
                     'repo': repo,
                     'prs': prs or []
@@ -369,15 +415,16 @@ class WebApp:
         @self.app.route('/api/delete_followed_author', methods=['DELETE'])
         def api_delete_followed_author():
             data = request.get_json()
+            platform = data.get('platform', 'gitee')  # 默认为gitee以保持向后兼容
             author = data.get('author')
             repo = data.get('repo')
             
             if not author or not repo:
                 return jsonify({'success': False, 'error': '缺少必要参数'}), 400
             
-            self.config.remove_followed_author(author, repo)
+            self.config.remove_followed_author(author, repo, platform)
             self.config.save_config()
-            logger.info(f"通过 API 删除关注作者 {author} 的仓库 {repo}")
+            logger.info(f"通过 API 删除关注作者 {author} 的仓库 {repo} (平台: {platform})")
             return jsonify({'success': True, 'message': '关注作者删除成功'})
         
     def run(self, host: str = '0.0.0.0', port: int = 5000, debug: bool = False) -> None:
