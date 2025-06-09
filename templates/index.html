@@ -57,8 +57,34 @@
         </div>
         
         <!-- 监控PR列表 -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">监控中的 PR</h5>
+                <div>
+                    <!-- 加载状态指示器 -->
+                    <div id="loading-indicator" class="d-none me-3">
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                                <span class="visually-hidden">加载中...</span>
+                            </div>
+                            <span id="loading-text">加载中...</span>
+                        </div>
+                        <div class="progress mt-2" style="width: 200px; height: 6px;">
+                            <div id="loading-progress" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary btn-sm" id="refresh-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-clockwise me-1" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+                            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+                        </svg>
+                        刷新所有数据
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover">
+                    <table class="table table-hover mb-0">
                         <thead>
                             <tr>
                                 <th scope="col" class="repo-name">仓库</th>
@@ -72,99 +98,14 @@
                             </tr>
                         </thead>
                         <tbody id="pr-table-body">
-                            {% for cache_key, pr_info in pr_data.items() %}
-                            <tr data-owner="{{ pr_info.owner }}" data-repo="{{ pr_info.repo }}" data-pr-id="{{ pr_info.pr_id }}">
-                                <td class="repo-name">
-                                    {% if pr_info.pr_details and pr_info.pr_details.base and pr_info.pr_details.base.repo and pr_info.pr_details.base.repo.html_url %}
-                                        <a href="{{ pr_info.pr_details.base.repo.html_url }}" target="_blank">{{ pr_info.owner }}/{{ pr_info.repo }}</a>
-                                    {% else %}
-                                        {{ pr_info.owner }}/{{ pr_info.repo }}
-                                    {% endif %}
-                                </td>
-                                <td class="pr-number">
-                                    {% if pr_info.pr_details and pr_info.pr_details.html_url %}
-                                        <a href="{{ pr_info.pr_details.html_url }}" target="_blank">#{{ pr_info.pr_id }}</a>
-                                    {% else %}
-                                        #{{ pr_info.pr_id }}
-                                    {% endif %}
-                                </td>
-                                <td class="pr-name">
-                                    {% if pr_info.pr_details and pr_info.pr_details.title %}
-                                        {% if pr_info.pr_details.html_url %}
-                                            <a href="{{ pr_info.pr_details.html_url }}" target="_blank" title="{{ pr_info.pr_details.title }}">
-                                                {{ pr_info.pr_details.title }}
-                                            </a>
-                                        {% else %}
-                                            {{ pr_info.pr_details.title }}
-                                        {% endif %}
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </td>
-                                <td class="pr-author">
-                                    {% if pr_info.pr_details and pr_info.pr_details.user %}
-                                        {% if pr_info.pr_details.user.html_url %}
-                                            <a href="{{ pr_info.pr_details.user.html_url }}" target="_blank">
-                                                {{ pr_info.pr_details.user.name or pr_info.pr_details.user.login }}
-                                            </a>
-                                        {% else %}
-                                            {{ pr_info.pr_details.user.name or pr_info.pr_details.user.login }}
-                                        {% endif %}
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </td>
-                                <td class="pr-branch">
-                                    {% if pr_info.pr_details and pr_info.pr_details.base and pr_info.pr_details.base.ref %}
-                                        {% if pr_info.pr_details.base.repo and pr_info.pr_details.base.repo.html_url %}
-                                            <a href="{{ pr_info.pr_details.base.repo.html_url }}/tree/{{ pr_info.pr_details.base.ref }}" target="_blank">
-                                                {{ pr_info.pr_details.base.ref }}
-                                            </a>
-                                        {% else %}
-                                            {{ pr_info.pr_details.base.ref }}
-                                        {% endif %}
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </td>
-                                <td class="pr-status">
-                                    {% if pr_info.pr_details and pr_info.pr_details.state %}
-                                        {% if pr_info.pr_details.state == 'open' %}
-                                            <span class="badge bg-success">Open</span>
-                                        {% elif pr_info.pr_details.state == 'closed' %}
-                                            <span class="badge bg-danger">Closed</span>
-                                        {% elif pr_info.pr_details.state == 'merged' %}
-                                            <span class="badge bg-secondary">Merged</span>
-                                        {% else %}
-                                            <span class="badge bg-warning">{{ pr_info.pr_details.state|title }}</span>
-                                        {% endif %}
-                                    {% else %}
-                                        <span class="badge bg-light text-dark">-</span>
-                                    {% endif %}
-                                </td>
-                                <td class="pr-labels">
-                                    {% for label in pr_info.current_labels %}
-                                    <span class="label-text me-2" data-color="{{ label.color }}" style="font-weight: bold;">{{ label.name }}</span>
-                                    {% endfor %}
-                                </td>
-                                <td>
-                                    <button class="btn btn-danger btn-sm delete-pr-btn" 
-                                            data-owner="{{ pr_info.owner }}" 
-                                            data-repo="{{ pr_info.repo }}" 
-                                            data-pr-id="{{ pr_info.pr_id }}">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
-                                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                                            <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
-                                        </svg>
-                                    </button>
-                                </td>
-                            </tr>
-                            {% endfor %}
+                            <!-- PR数据将通过流式加载动态填充 -->
                         </tbody>
                     </table>
                 </div>
             </div>
+        </div>
     </div>
+
     <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
     <script>
         // 应用标签文字颜色
@@ -202,9 +143,9 @@
                 minute: '2-digit'
             });
         }
-        
+
         // 显示消息提示
-        function showMessage(message, type = 'success') {
+        function showMessage(message, type = 'info') {
             const alertDiv = document.createElement('div');
             alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
             alertDiv.innerHTML = `
@@ -342,55 +283,125 @@
             tbody.appendChild(row);
         }
 
-        // 处理添加PR表单
-        document.getElementById('add-pr-form').addEventListener('submit', async function(e) {
-            e.preventDefault();
+        // 流式更新监控中的PR标签（使用SSE）
+        function updatePRLabelsStream() {
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const loadingText = document.getElementById('loading-text');
+            const loadingProgress = document.getElementById('loading-progress');
+            const tableBody = document.querySelector('#pr-table-body');
             
-            const prUrl = document.getElementById('pr_url').value.trim();
-            if (!prUrl) {
-                showMessage('请输入有效的 PR URL！', 'danger');
-                return;
-            }
+            // 显示加载指示器
+            loadingIndicator.classList.remove('d-none');
+            loadingText.textContent = '正在加载PR数据...';
+            loadingProgress.style.width = '0%';
             
-            try {
-                const response = await fetch('/api/add_pr', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ pr_url: prUrl })
-                });
+            // 清空现有数据
+            tableBody.innerHTML = '';
+            
+            // 创建EventSource连接
+            const eventSource = new EventSource('/api/pr_labels_stream');
+            
+            eventSource.onopen = function() {
+                console.log('SSE连接已建立');
+            };
+            
+            eventSource.addEventListener('start', function(event) {
+                const data = JSON.parse(event.data);
+                loadingText.textContent = `开始加载 ${data.total} 个PR的数据...`;
+            });
+            
+            eventSource.addEventListener('pr_data', function(event) {
+                const prData = JSON.parse(event.data);
+                addPRToTable(prData);
+            });
+            
+            eventSource.addEventListener('pr_error', function(event) {
+                const errorData = JSON.parse(event.data);
+                console.error(`加载PR数据失败 ${errorData.cache_key}:`, errorData.error);
                 
-                const result = await response.json();
-                
-                if (result.success) {
-                    showMessage(result.message, 'success');
-                    document.getElementById('pr_url').value = '';
-                    // 动态添加新行到表格
-                    addPRToTable(result.pr_data);
-                } else {
-                    showMessage(result.error, 'danger');
-                }
-            } catch (error) {
-                showMessage('添加PR时发生错误：' + error.message, 'danger');
-            }
-        });
+                // 仍然添加一行显示错误状态
+                const row = document.createElement('tr');
+                row.className = 'table-warning';
+                row.innerHTML = `
+                    <td>${errorData.owner}/${errorData.repo}</td>
+                    <td>#${errorData.pr_id}</td>
+                    <td colspan="4" class="text-danger">加载失败: ${errorData.error}</td>
+                    <td>
+                        <button class="btn btn-danger btn-sm delete-pr-btn" 
+                                data-owner="${errorData.owner}" 
+                                data-repo="${errorData.repo}" 
+                                data-pr-id="${errorData.pr_id}">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
+                                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                            </svg>
+                        </button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+            
+            eventSource.addEventListener('progress', function(event) {
+                const progressData = JSON.parse(event.data);
+                loadingProgress.style.width = `${progressData.percentage}%`;
+                loadingText.textContent = `正在加载... ${progressData.processed}/${progressData.total} (${progressData.percentage}%)`;
+            });
+            
+            eventSource.addEventListener('complete', function(event) {
+                loadingIndicator.classList.add('d-none');
+                eventSource.close();
+                console.log('所有PR数据加载完成');
+                showMessage('PR数据加载完成', 'success');
+            });
+            
+            eventSource.onerror = function(event) {
+                console.error('SSE连接错误:', event);
+                loadingIndicator.classList.add('d-none');
+                eventSource.close();
+                showMessage('加载PR数据时发生错误，请稍后重试', 'danger');
+            };
+        }
 
-        // 处理删除PR按钮
-        document.addEventListener('click', async function(e) {
-            // 查找最近的删除按钮元素（处理点击SVG图标或路径的情况）
-            const deleteBtn = e.target.closest('.delete-pr-btn');
-            if (deleteBtn) {
-                e.preventDefault();
-                
-                const owner = deleteBtn.dataset.owner;
-                const repo = deleteBtn.dataset.repo;
-                const prId = deleteBtn.dataset.prId;
-                
-                if (!confirm(`确定要删除 ${owner}/${repo} 的 PR #${prId} 吗？`)) {
-                    return;
-                }
-                
+        // 传统方式更新监控中的PR标签（作为备用）
+        function updatePRLabels() {
+            const tableBody = document.querySelector('#pr-table-body');
+            tableBody.innerHTML = '';
+            
+            fetch('/api/pr_labels')
+                .then(response => response.json())
+                .then(data => {
+                    for (const cacheKey in data) {
+                        const prInfo = data[cacheKey];
+                        addPRToTable(prInfo);
+                    }
+                    // 应用标签颜色
+                    applyLabelColors();
+                })
+                .catch(error => {
+                    console.error('Error fetching PR labels:', error);
+                    showMessage('加载PR数据失败，请检查网络连接', 'danger');
+                });
+        }
+
+        // 刷新所有数据（优先使用流式加载）
+        function refreshAllData() {
+            if (typeof EventSource !== 'undefined') {
+                updatePRLabelsStream();
+            } else {
+                // 浏览器不支持SSE，使用传统方式
+                updatePRLabels();
+                showMessage('正在刷新所有数据...', 'info');
+            }
+        }
+
+        // 处理删除PR事件
+        async function handleDeletePR(event) {
+            const deleteBtn = event.currentTarget;
+            const owner = deleteBtn.getAttribute('data-owner');
+            const repo = deleteBtn.getAttribute('data-repo');
+            const prId = deleteBtn.getAttribute('data-pr-id');
+            
+            if (confirm(`确定要删除监控 ${owner}/${repo} 的 PR #${prId} 吗？`)) {
                 try {
                     const response = await fetch('/api/delete_pr', {
                         method: 'DELETE',
@@ -420,148 +431,83 @@
                     showMessage('删除PR时发生错误：' + error.message, 'danger');
                 }
             }
-        });
-
-        // 更新监控中的PR标签
-        function updatePRLabels() {
-            fetch('/api/pr_labels')
-                .then(response => response.json())
-                .then(data => {
-                    const tableBody = document.querySelector('#pr-table-body');
-                    tableBody.innerHTML = '';
-                    for (const cacheKey in data) {
-                        const prInfo = data[cacheKey];
-                        const row = document.createElement('tr');
-                        row.setAttribute('data-owner', prInfo.owner);
-                        row.setAttribute('data-repo', prInfo.repo);
-                        row.setAttribute('data-pr-id', prInfo.pr_id);
-                        
-                        // 仓库列
-                        const repoCell = document.createElement('td');
-                        if (prInfo.pr_details && prInfo.pr_details.base && prInfo.pr_details.base.repo && prInfo.pr_details.base.repo.html_url) {
-                            repoCell.innerHTML = `<a href="${prInfo.pr_details.base.repo.html_url}" target="_blank">${prInfo.owner}/${prInfo.repo}</a>`;
-                        } else {
-                            repoCell.textContent = `${prInfo.owner}/${prInfo.repo}`;
-                        }
-                        
-                        // PR编号列
-                        const prIdCell = document.createElement('td');
-                        if (prInfo.pr_details && prInfo.pr_details.html_url) {
-                            prIdCell.innerHTML = `<a href="${prInfo.pr_details.html_url}" target="_blank">#${prInfo.pr_id}</a>`;
-                        } else {
-                            prIdCell.textContent = `#${prInfo.pr_id}`;
-                        }
-                        
-                        // PR名称列
-                        const titleCell = document.createElement('td');
-                        if (prInfo.pr_details && prInfo.pr_details.title) {
-                            if (prInfo.pr_details.html_url) {
-                                titleCell.innerHTML = `<a href="${prInfo.pr_details.html_url}" target="_blank" title="${prInfo.pr_details.title}">${prInfo.pr_details.title}</a>`;
-                            } else {
-                                titleCell.textContent = prInfo.pr_details.title;
-                            }
-                        } else {
-                            titleCell.textContent = '-';
-                        }
-                        
-                        // 提交人列
-                        const authorCell = document.createElement('td');
-                        if (prInfo.pr_details && prInfo.pr_details.user) {
-                            const userName = prInfo.pr_details.user.name || prInfo.pr_details.user.login;
-                            if (prInfo.pr_details.user.html_url) {
-                                authorCell.innerHTML = `<a href="${prInfo.pr_details.user.html_url}" target="_blank">${userName}</a>`;
-                            } else {
-                                authorCell.textContent = userName;
-                            }
-                        } else {
-                            authorCell.textContent = '-';
-                        }
-                        
-                        // 分支列
-                        const branchCell = document.createElement('td');
-                        if (prInfo.pr_details && prInfo.pr_details.base && prInfo.pr_details.base.ref) {
-                            const branchName = prInfo.pr_details.base.ref;
-                            if (prInfo.pr_details.base.repo && prInfo.pr_details.base.repo.html_url) {
-                                branchCell.innerHTML = `<a href="${prInfo.pr_details.base.repo.html_url}/tree/${branchName}" target="_blank">${branchName}</a>`;
-                            } else {
-                                branchCell.textContent = branchName;
-                            }
-                        } else {
-                            branchCell.textContent = '-';
-                        }
-                        
-                        // 状态列
-                        const statusCell = document.createElement('td');
-                        if (prInfo.pr_details && prInfo.pr_details.state) {
-                            const state = prInfo.pr_details.state;
-                            let badgeClass = 'bg-warning';
-                            let displayText = state.charAt(0).toUpperCase() + state.slice(1);
-                            
-                            if (state === 'open') {
-                                badgeClass = 'bg-success';
-                                displayText = 'Open';
-                            } else if (state === 'closed') {
-                                badgeClass = 'bg-danger';
-                                displayText = 'Closed';
-                            } else if (state === 'merged') {
-                                badgeClass = 'bg-secondary';
-                                displayText = 'Merged';
-                            }
-                            
-                            statusCell.innerHTML = `<span class="badge ${badgeClass}">${displayText}</span>`;
-                        } else {
-                            statusCell.innerHTML = `<span class="badge bg-light text-dark">-</span>`;
-                        }
-                        
-                        // 标签列
-                        const labelsCell = document.createElement('td');
-                        labelsCell.className = 'labels';
-                        labelsCell.innerHTML = createLabelHTML(prInfo.current_labels);
-                        
-                        // 操作列
-                        const actionCell = document.createElement('td');
-                        actionCell.className = 'pr-actions';
-                        actionCell.innerHTML = `<button class="btn btn-danger btn-sm delete-pr-btn" 
-                                data-owner="${prInfo.owner}" 
-                                data-repo="${prInfo.repo}" 
-                                data-pr-id="${prInfo.pr_id}">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
-                                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                                    <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
-                                </svg>
-                            </button>`;
-                        
-                        row.appendChild(repoCell);
-                        row.appendChild(prIdCell);
-                        row.appendChild(titleCell);
-                        row.appendChild(authorCell);
-                        row.appendChild(branchCell);
-                        row.appendChild(statusCell);
-                        row.appendChild(labelsCell);
-                        row.appendChild(actionCell);
-                        tableBody.appendChild(row);
-                    }
-                    // 应用标签颜色
-                    applyLabelColors();
-                })
-                .catch(error => console.error('Error fetching PR labels:', error));
         }
-        
-        // 刷新所有数据按钮事件处理
-        document.getElementById('refresh-all').addEventListener('click', function() {
-            updatePRLabels();
-            showMessage('正在刷新所有数据...', 'info');
-        });
-        
+
+        // 处理添加PR表单提交
+        async function handleAddPRForm(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const prUrl = formData.get('pr_url');
+            
+            if (!prUrl) {
+                showMessage('请输入PR URL', 'warning');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/add_pr', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ pr_url: prUrl })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(result.message, 'success');
+                    // 清空表单
+                    event.target.reset();
+                    // 添加新PR到表格
+                    if (result.pr_data) {
+                        addPRToTable(result.pr_data);
+                    }
+                } else {
+                    showMessage(result.error, 'danger');
+                }
+            } catch (error) {
+                showMessage('添加PR时发生错误：' + error.message, 'danger');
+            }
+        }
+
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 添加PR表单提交事件
+            const addPrForm = document.getElementById('add-pr-form');
+            if (addPrForm) {
+                addPrForm.addEventListener('submit', handleAddPRForm);
+            }
+
+            // 删除PR按钮点击事件（使用事件委托）
+            document.addEventListener('click', function(e) {
+                const deleteBtn = e.target.closest('.delete-pr-btn');
+                if (deleteBtn) {
+                    e.preventDefault();
+                    handleDeletePR(e);
+                }
+            });
+
+            // 刷新按钮事件
+            const refreshAllBtn = document.getElementById('refresh-all');
+            if (refreshAllBtn) {
+                refreshAllBtn.addEventListener('click', refreshAllData);
+            }
+            
+            const refreshBtn = document.getElementById('refresh-btn');
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', refreshAllData);
+            }
+        }
+
         // 定时刷新
-        setInterval(updatePRLabels, 60000); // 每分钟刷新监控PR
+        setInterval(refreshAllData, 60000); // 每分钟刷新监控PR
         
-        // 初始加载
-        updatePRLabels();
-        
-        // 页面加载完成后应用标签颜色
+        // 页面初始化
         document.addEventListener('DOMContentLoaded', function() {
-            applyLabelColors();
+            setupEventListeners();
+            // 初始加载PR数据
+            refreshAllData();
         });
     </script>
 </body>

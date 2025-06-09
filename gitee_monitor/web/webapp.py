@@ -3,7 +3,8 @@ Flask Web 应用模块，处理 Web 界面和 API 请求
 """
 import logging
 import re
-from flask import Flask, request, render_template, redirect, url_for, jsonify
+import json
+from flask import Flask, request, render_template, redirect, url_for, jsonify, Response
 
 from ..config.config_manager import Config
 from ..services.pr_monitor import PRMonitor
@@ -33,25 +34,8 @@ class WebApp:
         # 主页
         @self.app.route('/')
         def index():
-            pr_data = {}
-            for pr_config in self.config.get_pr_lists():
-                owner = pr_config.get("OWNER")
-                repo = pr_config.get("REPO")
-                pr_id = pr_config.get("PULL_REQUEST_ID")
-                
-                if owner and repo and pr_id:
-                    cache_key = f"{owner}/{repo}#{pr_id}"
-                    labels = self.pr_monitor.get_pr_labels(owner, repo, pr_id)
-                    pr_details = self.pr_monitor.get_pr_details(owner, repo, pr_id)
-                    
-                    pr_data[cache_key] = {
-                        "current_labels": labels,  # 传递完整的标签对象，包含颜色信息
-                        "owner": owner,
-                        "repo": repo,
-                        "pr_id": pr_id,
-                        "pr_details": pr_details  # 包含提交人、分支等详细信息
-                    }
-            return render_template('index.html', pr_data=pr_data)
+            # 不再预加载PR数据，改为使用流式加载
+            return render_template('index.html', pr_data={})
         
         # 配置页面
         @self.app.route('/config', methods=['GET', 'POST'])
@@ -186,6 +170,73 @@ class WebApp:
                         "pr_details": pr_details  # 包含提交人、分支等详细信息
                     }
             return jsonify(pr_data)
+        
+        # 新的流式PR标签API端点，支持逐个返回PR数据
+        @self.app.route('/api/pr_labels_stream', methods=['GET'])
+        def api_pr_labels_stream():
+            force_refresh = request.args.get('refresh', '').lower() == 'true'
+            
+            def generate():
+                pr_configs = self.config.get_pr_lists()
+                total_prs = len(pr_configs)
+                processed = 0
+                
+                # 发送开始事件
+                yield f"event: start\ndata: {json.dumps({'total': total_prs})}\n\n"
+                
+                for pr_config in pr_configs:
+                    owner = pr_config.get("OWNER")
+                    repo = pr_config.get("REPO")
+                    pr_id = pr_config.get("PULL_REQUEST_ID")
+                    
+                    if owner and repo and pr_id:
+                        try:
+                            cache_key = f"{owner}/{repo}#{pr_id}"
+                            labels = self.pr_monitor.get_pr_labels(owner, repo, pr_id, force_refresh=force_refresh)
+                            pr_details = self.pr_monitor.get_pr_details(owner, repo, pr_id, force_refresh=force_refresh)
+                            
+                            pr_data = {
+                                "cache_key": cache_key,
+                                "current_labels": labels,
+                                "owner": owner,
+                                "repo": repo,
+                                "pr_id": pr_id,
+                                "pr_details": pr_details
+                            }
+                            
+                            # 发送PR数据事件
+                            yield f"event: pr_data\ndata: {json.dumps(pr_data)}\n\n"
+                            
+                        except Exception as e:
+                            # 发送错误事件
+                            error_data = {
+                                "cache_key": f"{owner}/{repo}#{pr_id}",
+                                "error": str(e),
+                                "owner": owner,
+                                "repo": repo,
+                                "pr_id": pr_id
+                            }
+                            yield f"event: pr_error\ndata: {json.dumps(error_data)}\n\n"
+                            logger.error(f"获取PR数据失败 {owner}/{repo}#{pr_id}: {e}")
+                    
+                    processed += 1
+                    # 发送进度事件
+                    progress_data = {
+                        "processed": processed,
+                        "total": total_prs,
+                        "percentage": round((processed / total_prs) * 100, 1) if total_prs > 0 else 100
+                    }
+                    yield f"event: progress\ndata: {json.dumps(progress_data)}\n\n"
+                
+                # 发送完成事件
+                yield f"event: complete\ndata: {json.dumps({'message': 'All PR data loaded'})}\n\n"
+            
+            return Response(generate(), mimetype='text/event-stream',
+                          headers={
+                              'Cache-Control': 'no-cache',
+                              'Connection': 'keep-alive',
+                              'Access-Control-Allow-Origin': '*'
+                          })
         
         # 添加 PR API 端点
         @self.app.route('/api/add_pr', methods=['POST'])
