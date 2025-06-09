@@ -5,7 +5,9 @@
 ## 功能
 
 - 监控指定 PR 的标签变化
-- Web 界面查看和配置
+- Material You 风格的现代化 Web 界面
+- 响应式设计，适配不同设备
+- 直观的 PR 标签和状态显示
 - Webhook 接收实时通知
 - 自动轮询 PR 标签
 - 缓存机制避免频繁 API 调用
@@ -47,8 +49,17 @@ python main.py
 
 访问 `http://localhost:5000` 打开 Web 界面。
 
-- 主页: 查看所有监控的 PR 及其标签
-- 配置页: 修改 API 配置和管理监控的 PR
+- **主页**: 查看所有监控的 PR 及其标签
+  - 直观的表格布局，显示仓库、PR编号、PR名称、提交人、分支、状态和标签
+  - 彩色状态徽章显示PR状态（Open、Closed、Merged）
+  - 动态颜色的标签显示
+  - 一键添加新PR和删除现有PR
+  - 一键刷新所有PR数据
+
+- **配置页**: 修改 API 配置和管理监控的 PR
+  - 直观的API配置表单
+  - 关注作者列表管理
+  - 所有操作按钮都配有直观的图标
 
 ### Webhook
 
@@ -115,7 +126,12 @@ gitee_monitor/
 ├── logs/
 ├── static/
 │   ├── css/
-│   └── js/
+│   │   ├── bootstrap.min.css
+│   │   ├── config.css
+│   │   ├── custom.css
+│   │   └── material.css
+│   ├── js/
+│   └── material.css
 ├── templates/
 ├── config.json
 ├── main.py
@@ -128,3 +144,13 @@ gitee_monitor/
 - `config`: 配置管理
 - `services`: PR 监控服务
 - `web`: Flask Web 应用
+- `static/material.css`: Material You 风格的 UI 组件
+
+### UI 特性
+
+- **Material You 设计**: 现代化的 UI 设计，符合 Google 的 Material You 设计语言
+- **响应式布局**: 自适应不同屏幕尺寸的设备
+- **直观的图标**: 所有操作按钮都配有直观的 SVG 图标
+- **动态标签颜色**: PR 标签根据其颜色自动调整文本颜色以确保可读性
+- **状态徽章**: 使用颜色编码的徽章显示 PR 状态（Open、Closed、Merged）
+- **优化的表格布局**: 自适应列宽，确保内容清晰可读
