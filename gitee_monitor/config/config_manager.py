@@ -15,6 +15,7 @@ class Config:
         "GITEA_URL": "https://gitee.com/api/v5",
         "ACCESS_TOKEN": "",
         "PULL_REQUEST_LISTS": [],  # PR监控列表，每个元素包含OWNER、REPO、PULL_REQUEST_ID
+        "FOLLOWED_AUTHORS": [],  # 关注的PR创建者列表，每个元素包含AUTHOR、REPO
         "CACHE_TTL": 300,  # 缓存生存时间（秒）
         "POLL_INTERVAL": 60,  # 轮询间隔（秒）
         "ENABLE_NOTIFICATIONS": False,  # 是否启用通知
@@ -185,3 +186,57 @@ class Config:
         """
         pr_lists = self.config.get("PULL_REQUEST_LISTS", [])
         return [pr.get("PULL_REQUEST_ID") for pr in pr_lists if pr.get("PULL_REQUEST_ID")]
+        
+    def add_followed_author(self, author: str, repo: str) -> None:
+        """
+        添加关注的PR创建者
+        
+        Args:
+            author: PR创建者用户名
+            repo: 仓库名称，格式为 owner/repo
+        """
+        followed_authors = self.config.get("FOLLOWED_AUTHORS", [])
+        
+        # 检查是否已存在相同的关注
+        for existing_author in followed_authors:
+            if (existing_author.get("AUTHOR") == author and 
+                existing_author.get("REPO") == repo):
+                logger.warning(f"作者 {author} 的仓库 {repo} 已存在于关注列表中")
+                return
+        
+        # 添加新关注
+        followed_authors.append({
+            "AUTHOR": author,
+            "REPO": repo
+        })
+        self.config["FOLLOWED_AUTHORS"] = followed_authors
+        logger.info(f"添加作者 {author} 的仓库 {repo} 到关注列表")
+    
+    def remove_followed_author(self, author: str, repo: str) -> None:
+        """
+        从关注列表中移除PR创建者
+        
+        Args:
+            author: PR创建者用户名
+            repo: 仓库名称，格式为 owner/repo
+        """
+        followed_authors = self.config.get("FOLLOWED_AUTHORS", [])
+        
+        for i, existing_author in enumerate(followed_authors):
+            if (existing_author.get("AUTHOR") == author and 
+                existing_author.get("REPO") == repo):
+                followed_authors.pop(i)
+                self.config["FOLLOWED_AUTHORS"] = followed_authors
+                logger.info(f"从关注列表中移除作者 {author} 的仓库 {repo}")
+                return
+        
+        logger.warning(f"未找到要移除的作者 {author} 的仓库 {repo}")
+    
+    def get_followed_authors(self) -> List[Dict[str, Any]]:
+        """
+        获取所有关注的PR创建者列表
+        
+        Returns:
+            关注列表，每个元素包含 AUTHOR、REPO
+        """
+        return self.config.get("FOLLOWED_AUTHORS", [])

@@ -195,6 +195,75 @@ class PRMonitor:
                 result[cache_key] = self.get_pr_labels(owner, repo, pr_id, force_refresh)
                 
         return result
+        
+    def get_followed_author_prs(self, force_refresh: bool = False, auto_add_to_monitor: bool = True) -> List[Dict[str, Any]]:
+        """
+        获取所有关注作者的PR列表，并可选择自动将其添加到监控列表中
+        
+        Args:
+            force_refresh: 是否强制刷新缓存
+            auto_add_to_monitor: 是否自动将关注作者的PR添加到监控列表中
+            
+        Returns:
+            所有关注作者的PR列表
+        """
+        all_prs = []
+        for author_config in self.config.get_followed_authors():
+            author = author_config.get("AUTHOR")
+            repo_full = author_config.get("REPO")
+            
+            if author and repo_full and "/" in repo_full:
+                owner, repo = repo_full.split("/", 1)
+                cache_key = f"{author}@{repo_full}"
+                
+                if force_refresh:
+                    self.cache.invalidate(cache_key)
+                
+                # 检查缓存
+                cached_data = self.cache.get(cache_key)
+                if cached_data:
+                    prs = cached_data
+                else:
+                    # 缓存不存在，从 API 获取
+                    access_token = self.config.get("ACCESS_TOKEN")
+                    
+                    if not access_token:
+                        logger.warning(f"无法获取作者 {author} 的PR列表：ACCESS_TOKEN 未配置")
+                        continue
+                    
+                    prs = self.api_client.get_author_prs(owner, repo, author)
+                    if prs:
+                        self.cache.set(cache_key, prs)
+                    else:
+                        prs = []
+                
+                # 将PR添加到结果列表
+                all_prs.extend(prs)
+                
+                # 自动将PR添加到监控列表
+                if auto_add_to_monitor and prs:
+                    for pr in prs:
+                        pr_id = pr.get("number")
+                        if pr_id:
+                            # 检查PR是否已在监控列表中
+                            is_monitored = False
+                            for pr_config in self.config.get_pr_lists():
+                                if (pr_config.get("OWNER") == owner and 
+                                    pr_config.get("REPO") == repo and 
+                                    pr_config.get("PULL_REQUEST_ID") == pr_id):
+                                    is_monitored = True
+                                    break
+                            
+                            # 如果不在监控列表中，则添加
+                            if not is_monitored:
+                                self.config.add_pr(owner, repo, pr_id)
+                                logger.info(f"自动添加关注作者 {author} 的 PR #{pr_id} ({owner}/{repo}) 到监控列表")
+                
+        # 保存配置以保存自动添加的PR
+        if auto_add_to_monitor and all_prs:
+            self.config.save_config()
+            
+        return all_prs
     
     def _poll_loop(self) -> None:
         """轮询 PR 标签的后台线程"""

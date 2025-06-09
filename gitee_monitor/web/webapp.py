@@ -88,6 +88,20 @@ class WebApp:
                             self.config.add_pr(owner, repo, pr_id)
                             self.config.save_config()
                             logger.info(f"通过 URL 添加 PR #{pr_id} ({owner}/{repo}) 到监控列表")
+                elif action == 'add_followed_author':
+                    author = request.form.get('author', '').strip()
+                    repo = request.form.get('repo', '').strip()
+                    
+                    if not author or not repo:
+                        error = '作者和仓库都是必填的！'
+                    else:
+                        # 验证仓库格式
+                        if '/' not in repo:
+                            error = '仓库格式不正确，应为 owner/repo 格式'
+                        else:
+                            self.config.add_followed_author(author, repo)
+                            self.config.save_config()
+                            logger.info(f"通过表单添加关注作者 {author} 的仓库 {repo}")
                 if error:
                     return render_template('config.html', config=self.config, error=error)
                 return redirect(url_for('config_page'))
@@ -102,6 +116,16 @@ class WebApp:
                     self.config.remove_pr(owner, repo, pr_id)
                     self.config.save_config()
                     logger.info(f"删除 PR #{pr_id} ({owner}/{repo}) 从监控列表")
+                return redirect(url_for('config_page'))
+                
+            if request.args.get('action') == 'delete_followed_author':
+                author = request.args.get('author')
+                repo = request.args.get('repo')
+                
+                if author and repo:
+                    self.config.remove_followed_author(author, repo)
+                    self.config.save_config()
+                    logger.info(f"删除关注作者 {author} 的仓库 {repo}")
                 return redirect(url_for('config_page'))
             
             return render_template('config.html', config=self.config, error=None)
@@ -245,6 +269,65 @@ class WebApp:
             logger.info("通过 API 更新 API 配置")
             
             return jsonify({'success': True, 'message': 'API 配置更新成功'})
+            
+        # 获取关注作者的PR列表 API 端点
+        @self.app.route('/api/followed_author_prs', methods=['GET'])
+        def api_followed_author_prs():
+            force_refresh = request.args.get('force_refresh', '').lower() == 'true'
+            # 获取关注作者的PR并自动添加到监控列表
+            prs = self.pr_monitor.get_followed_author_prs(force_refresh=force_refresh, auto_add_to_monitor=True)
+            return jsonify(prs)
+        
+        # 添加关注作者 API 端点
+        @self.app.route('/api/add_followed_author', methods=['POST'])
+        def api_add_followed_author():
+            data = request.get_json()
+            author = data.get('author', '').strip()
+            repo = data.get('repo', '').strip()
+            
+            if not author or not repo:
+                return jsonify({'success': False, 'error': '作者和仓库都是必填的！'}), 400
+            
+            # 验证仓库格式
+            if '/' not in repo:
+                return jsonify({'success': False, 'error': '仓库格式不正确，应为 owner/repo 格式'}), 400
+                
+            self.config.add_followed_author(author, repo)
+            self.config.save_config()
+            logger.info(f"通过 API 添加关注作者 {author} 的仓库 {repo}")
+            
+            # 获取新添加作者的PR列表
+            try:
+                owner, repo_name = repo.split('/', 1)
+                prs = self.pr_monitor.api_client.get_author_prs(owner, repo_name, author)
+            except Exception as e:
+                logger.warning(f"获取新添加作者的PR列表失败: {e}")
+                prs = []
+            
+            return jsonify({
+                'success': True, 
+                'message': '关注作者添加成功',
+                'author_data': {
+                    'author': author,
+                    'repo': repo,
+                    'prs': prs or []
+                }
+            })
+        
+        # 删除关注作者 API 端点
+        @self.app.route('/api/delete_followed_author', methods=['DELETE'])
+        def api_delete_followed_author():
+            data = request.get_json()
+            author = data.get('author')
+            repo = data.get('repo')
+            
+            if not author or not repo:
+                return jsonify({'success': False, 'error': '缺少必要参数'}), 400
+            
+            self.config.remove_followed_author(author, repo)
+            self.config.save_config()
+            logger.info(f"通过 API 删除关注作者 {author} 的仓库 {repo}")
+            return jsonify({'success': True, 'message': '关注作者删除成功'})
         
     def run(self, host: str = '0.0.0.0', port: int = 5000, debug: bool = False) -> None:
         """

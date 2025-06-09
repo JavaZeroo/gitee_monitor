@@ -1,0 +1,91 @@
+/* config页面的样式 */
+.container { 
+    max-width: 1200px; 
+    margin: 0 auto;
+    padding: 0 15px;
+}
+
+.btn-custom { 
+    background-color: #28a745; 
+    color: white; 
+}
+
+/* 表格通用样式 */
+.table {
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto;
+    border-collapse: collapse;
+}
+
+/* 表头样式 */
+.table th {
+    white-space: nowrap;
+    text-align: center;
+    padding: 10px 12px;
+    font-weight: 600;
+    font-size: 14px;
+    background-color: #f8f9fa;
+}
+
+/* 表格内容对齐 */
+.table td {
+    vertical-align: middle;
+    padding: 10px 12px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.4;
+}
+
+/* 表格内链接样式 */
+.table td a {
+    color: #0d6efd;
+    text-decoration: none;
+}
+
+.table td a:hover {
+    text-decoration: underline;
+    color: #0a58ca;
+}
+
+/* 关注作者表格样式 */
+.table.author-table th:nth-child(1) { 
+    width: 30%; 
+} /* 作者列 */
+
+.table.author-table th:nth-child(2) { 
+    width: 50%; 
+} /* 仓库列 */
+
+.table.author-table th:nth-child(3) { 
+    width: 20%; 
+} /* 操作列 */
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .container {
+        padding: 0 10px;
+    }
+    
+    .table {
+        font-size: 14px;
+    }
+    
+    .table th, .table td {
+        padding: 8px 6px;
+    }
+}
+
+@media (max-width: 576px) {
+    .container {
+        padding: 0 8px;
+    }
+    
+    .table {
+        font-size: 13px;
+    }
+    
+    .table th, .table td {
+        padding: 6px 4px;
+    }
+}

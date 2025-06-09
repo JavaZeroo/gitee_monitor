@@ -67,3 +67,41 @@ class GiteeAPIClient:
         except requests.RequestException as e:
             logger.error(f"获取 PR #{pr_id} 详情失败: {e}")
             return None
+            
+    def get_author_prs(self, owner: str, repo: str, author: str, state: str = "open", page: int = 1, per_page: int = 20) -> Optional[List[Dict[str, Any]]]:
+        """
+        获取指定作者在特定仓库的PR列表
+        
+        Args:
+            owner: 仓库拥有者
+            repo: 仓库名称
+            author: PR创建者用户名
+            state: PR状态，可选值为 open, closed, all，默认为 open
+            page: 页码，默认为1
+            per_page: 每页数量，默认为20
+            
+        Returns:
+            PR列表，出错时返回 None
+        """
+        url = f"{self.api_url}/repos/{owner}/{repo}/pulls"
+        params = {
+            "state": state,
+            "sort": "created",
+            "direction": "desc",
+            "page": page,
+            "per_page": per_page,
+            "author": author
+        }
+        
+        if self.access_token:
+            params["access_token"] = self.access_token
+            
+        try:
+            response = requests.get(url, params=params, headers=self.headers, timeout=10)
+            response.raise_for_status()
+            prs = response.json()
+            logger.debug(f"获取作者 {author} 在 {owner}/{repo} 的PR列表成功，共 {len(prs)} 个")
+            return prs
+        except requests.RequestException as e:
+            logger.error(f"获取作者 {author} 在 {owner}/{repo} 的PR列表失败: {e}")
+            return None
