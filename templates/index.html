@@ -47,7 +47,7 @@
                 修改配置
             </a>
             <div>
-                <button id="refresh-all" class="btn btn-outline-secondary">
+                <button id="refresh-all" class="btn btn-primary">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-clockwise me-1" viewBox="0 0 16 16">
                         <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
                         <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
@@ -59,28 +59,19 @@
         
         <!-- 监控PR列表 -->
         <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="card-header">
                 <h5 class="mb-0">监控中的 PR</h5>
-                <div>
-                    <!-- 加载状态指示器 -->
-                    <div id="loading-indicator" class="d-none me-3">
-                        <div class="d-flex align-items-center">
-                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
-                                <span class="visually-hidden">加载中...</span>
-                            </div>
-                            <span id="loading-text">加载中...</span>
+                <!-- 加载状态指示器 -->
+                <div id="loading-indicator" class="d-none mt-2">
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                            <span class="visually-hidden">加载中...</span>
                         </div>
-                        <div class="progress mt-2" style="width: 200px; height: 6px;">
-                            <div id="loading-progress" class="progress-bar" role="progressbar" style="width: 0%"></div>
-                        </div>
+                        <span id="loading-text">加载中...</span>
                     </div>
-                    <button class="btn btn-primary btn-sm" id="refresh-btn">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-clockwise me-1" viewBox="0 0 16 16">
-                            <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
-                            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
-                        </svg>
-                        刷新所有数据
-                    </button>
+                    <div class="progress mt-2" style="width: 200px; height: 6px;">
+                        <div id="loading-progress" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                    </div>
                 </div>
             </div>
             <div class="card-body p-0">
@@ -108,8 +99,239 @@
         </div>
     </div>
 
+    <!-- 批量操作工具栏 -->
+    <div id="batch-toolbar" class="batch-toolbar d-none">
+        <div class="selected-count">
+            已选择 <span id="selected-count">0</span> 个 PR
+        </div>
+        <button class="btn btn-outline-primary btn-sm" id="select-all-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check-all me-1" viewBox="0 0 16 16">
+                <path d="M8.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L2.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093L8.95 4.992a.252.252 0 0 1 .02-.022zm-.92 5.14.92.92a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 1 0-1.091-1.028L9.477 9.417l-.485-.486-.943 1.179z"/>
+            </svg>
+            全选
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" id="clear-selection-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-x-square me-1" viewBox="0 0 16 16">
+                <path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/>
+                <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+            </svg>
+            清除选择
+        </button>
+        <div class="vr"></div>
+        <button class="btn btn-danger btn-sm" id="batch-delete-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash me-1" viewBox="0 0 16 16">
+                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+            </svg>
+            批量删除
+        </button>
+        <button class="btn btn-success btn-sm" id="batch-refresh-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-clockwise me-1" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+                <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+            </svg>
+            批量刷新
+        </button>
+    </div>
+
     <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
     <script>
+        // 多选功能相关变量
+        let selectedRows = new Set();
+        
+        // 多选功能相关函数
+        function toggleRowSelection(row, event) {
+            // 阻止事件冒泡到删除按钮等其他元素
+            if (event.target.closest('.delete-pr-btn') || event.target.closest('a')) {
+                return;
+            }
+            
+            const rowId = getRowId(row);
+            
+            if (selectedRows.has(rowId)) {
+                // 取消选中
+                selectedRows.delete(rowId);
+                row.classList.remove('selected');
+            } else {
+                // 选中
+                selectedRows.add(rowId);
+                row.classList.add('selected');
+            }
+            
+            updateBatchToolbar();
+        }
+        
+        function getRowId(row) {
+            const platform = row.getAttribute('data-platform') || 'gitee';
+            const owner = row.getAttribute('data-owner');
+            const repo = row.getAttribute('data-repo');
+            const prId = row.getAttribute('data-pr-id');
+            return `${platform}:${owner}/${repo}#${prId}`;
+        }
+        
+        function updateBatchToolbar() {
+            const toolbar = document.getElementById('batch-toolbar');
+            const countElement = document.getElementById('selected-count');
+            const selectAllBtn = document.getElementById('select-all-btn');
+            
+            countElement.textContent = selectedRows.size;
+            
+            if (selectedRows.size > 0) {
+                toolbar.classList.remove('d-none');
+                toolbar.classList.add('show');
+                toolbar.classList.remove('hide');
+            } else {
+                toolbar.classList.add('hide');
+                toolbar.classList.remove('show');
+                setTimeout(() => {
+                    if (selectedRows.size === 0) {
+                        toolbar.classList.add('d-none');
+                    }
+                }, 300);
+            }
+            
+            // 更新全选按钮状态
+            const totalRows = document.querySelectorAll('#pr-table-body tr').length;
+            if (selectedRows.size === totalRows && totalRows > 0) {
+                selectAllBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check-square me-1" viewBox="0 0 16 16">
+                        <path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/>
+                        <path d="M10.97 4.97a.75.75 0 0 1 1.071 1.05l-3.992 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093L10.97 4.97z"/>
+                    </svg>
+                    取消全选`;
+            } else {
+                selectAllBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check-all me-1" viewBox="0 0 16 16">
+                        <path d="M8.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L2.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093L8.95 4.992a.252.252 0 0 1 .02-.022zm-.92 5.14.92.92a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 1 0-1.091-1.028L9.477 9.417l-.485-.486-.943 1.179z"/>
+                    </svg>
+                    全选`;
+            }
+        }
+        
+        function selectAllRows() {
+            const rows = document.querySelectorAll('#pr-table-body tr');
+            const totalRows = rows.length;
+            
+            if (selectedRows.size === totalRows && totalRows > 0) {
+                // 当前是全选状态，执行取消全选
+                clearSelection();
+            } else {
+                // 执行全选
+                rows.forEach(row => {
+                    const rowId = getRowId(row);
+                    selectedRows.add(rowId);
+                    row.classList.add('selected');
+                });
+                updateBatchToolbar();
+            }
+        }
+        
+        function clearSelection() {
+            const rows = document.querySelectorAll('#pr-table-body tr.selected');
+            rows.forEach(row => {
+                row.classList.remove('selected');
+            });
+            selectedRows.clear();
+            updateBatchToolbar();
+        }
+        
+        // 批量操作函数
+        async function batchDeletePRs() {
+            if (selectedRows.size === 0) {
+                showMessage('请先选择要删除的PR', 'warning');
+                return;
+            }
+            
+            if (!confirm(`确定要删除选中的 ${selectedRows.size} 个PR吗？`)) {
+                return;
+            }
+            
+            const selectedArray = Array.from(selectedRows);
+            let successCount = 0;
+            let failCount = 0;
+            
+            showMessage(`开始批量删除 ${selectedArray.length} 个PR...`, 'info');
+            
+            for (const rowId of selectedArray) {
+                try {
+                    const [platform, rest] = rowId.split(':');
+                    const [repo, prId] = rest.split('#');
+                    const [owner, repoName] = repo.split('/');
+                    
+                    const response = await fetch('/api/delete_pr', {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            platform: platform,
+                            owner: owner,
+                            repo: repoName,
+                            pr_id: parseInt(prId)
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        // 从DOM中移除该行
+                        const row = document.querySelector(`tr[data-platform="${platform}"][data-owner="${owner}"][data-repo="${repoName}"][data-pr-id="${prId}"]`);
+                        if (row) {
+                            row.remove();
+                        }
+                        selectedRows.delete(rowId);
+                        successCount++;
+                    } else {
+                        failCount++;
+                        console.error(`删除PR ${rowId} 失败:`, result.error);
+                    }
+                } catch (error) {
+                    failCount++;
+                    console.error(`删除PR ${rowId} 时发生错误:`, error);
+                }
+            }
+            
+            updateBatchToolbar();
+            
+            if (failCount === 0) {
+                showMessage(`成功删除 ${successCount} 个PR`, 'success');
+            } else {
+                showMessage(`删除完成：成功 ${successCount} 个，失败 ${failCount} 个`, 'warning');
+            }
+        }
+        
+        async function batchRefreshPRs() {
+            if (selectedRows.size === 0) {
+                showMessage('请先选择要刷新的PR', 'warning');
+                return;
+            }
+            
+            showMessage(`开始批量刷新 ${selectedRows.size} 个PR...`, 'info');
+            
+            // 标记选中的行为正在更新状态
+            selectedRows.forEach(rowId => {
+                const [platform, rest] = rowId.split(':');
+                const [repo, prId] = rest.split('#');
+                const [owner, repoName] = repo.split('/');
+                
+                const row = document.querySelector(`tr[data-platform="${platform}"][data-owner="${owner}"][data-repo="${repoName}"][data-pr-id="${prId}"]`);
+                if (row) {
+                    row.classList.add('updating');
+                    const firstCell = row.querySelector('td:first-child');
+                    if (firstCell && !firstCell.querySelector('.updating-icon')) {
+                        const updateIcon = document.createElement('span');
+                        updateIcon.className = 'updating-icon text-muted me-1';
+                        updateIcon.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">刷新中...</span></div>';
+                        firstCell.insertBefore(updateIcon, firstCell.firstChild);
+                    }
+                }
+            });
+            
+            // 触发整体刷新，但只刷新选中的PR
+            refreshAllData();
+            showMessage('批量刷新已开始', 'success');
+        }
+
         // 应用标签文字颜色
         function applyLabelColors() {
             document.querySelectorAll('.label-text').forEach(label => {
@@ -172,8 +394,8 @@
         }
 
         // 动态添加PR到表格
-        function addPRToTable(prData) {
-            const tbody = document.getElementById('pr-table-body');
+        function addPRToTable(prData, targetTbody) {
+            const tbody = targetTbody || document.getElementById('pr-table-body');
             const row = document.createElement('tr');
             row.setAttribute('data-platform', prData.platform || 'gitee');
             row.setAttribute('data-owner', prData.owner);
@@ -318,45 +540,145 @@
             tbody.appendChild(row);
         }
 
-        // 流式更新监控中的PR标签（使用SSE）
-        function updatePRLabelsStream() {
-            const loadingIndicator = document.getElementById('loading-indicator');
-            const loadingText = document.getElementById('loading-text');
-            const loadingProgress = document.getElementById('loading-progress');
+        // 标记所有行为"正在更新"状态
+        function markAllRowsAsUpdating() {
             const tableBody = document.querySelector('#pr-table-body');
+            const rows = tableBody.querySelectorAll('tr');
             
-            // 显示加载指示器
-            loadingIndicator.classList.remove('d-none');
-            loadingText.textContent = '正在加载PR数据...';
-            loadingProgress.style.width = '0%';
-            
-            // 清空现有数据
-            tableBody.innerHTML = '';
-            
-            // 创建EventSource连接
-            const eventSource = new EventSource('/api/pr_labels_stream');
-            
-            eventSource.onopen = function() {
-                console.log('SSE连接已建立');
-            };
-            
-            eventSource.addEventListener('start', function(event) {
-                const data = JSON.parse(event.data);
-                loadingText.textContent = `开始加载 ${data.total} 个PR的数据...`;
-            });
-            
-            eventSource.addEventListener('pr_data', function(event) {
-                const prData = JSON.parse(event.data);
-                addPRToTable(prData);
-            });
-            
-            eventSource.addEventListener('pr_error', function(event) {
-                const errorData = JSON.parse(event.data);
-                console.error(`加载PR数据失败 ${errorData.cache_key}:`, errorData.error);
+            rows.forEach(row => {
+                // 添加正在更新的样式类
+                row.classList.add('updating');
                 
-                // 仍然添加一行显示错误状态
+                // 在第一列添加刷新图标
+                const firstCell = row.querySelector('td:first-child');
+                if (firstCell && !firstCell.querySelector('.updating-icon')) {
+                    const updateIcon = document.createElement('span');
+                    updateIcon.className = 'updating-icon text-muted me-1';
+                    updateIcon.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">更新中...</span></div>';
+                    firstCell.insertBefore(updateIcon, firstCell.firstChild);
+                }
+            });
+        }
+
+        // 根据缓存键查找对应的表格行
+        function findRowByCacheKey(cacheKey) {
+            const tableBody = document.querySelector('#pr-table-body');
+            const rows = tableBody.querySelectorAll('tr');
+            
+            for (const row of rows) {
+                const platform = row.getAttribute('data-platform') || 'gitee';
+                const owner = row.getAttribute('data-owner');
+                const repo = row.getAttribute('data-repo');
+                const prId = row.getAttribute('data-pr-id');
+                
+                if (owner && repo && prId) {
+                    const rowCacheKey = `${platform}:${owner}/${repo}#${prId}`;
+                    if (rowCacheKey === cacheKey) {
+                        return row;
+                    }
+                }
+            }
+            return null;
+        }
+
+        // 更新或添加PR到表格
+        function updateOrAddPRToTable(prData) {
+            const cacheKey = prData.cache_key;
+            const existingRow = findRowByCacheKey(cacheKey);
+            
+            if (existingRow) {
+                // 更新现有行
+                updateExistingRow(existingRow, prData);
+            } else {
+                // 添加新行
+                addPRToTable(prData);
+            }
+        }
+
+        // 更新现有行的数据
+        function updateExistingRow(row, prData) {
+            const tbody = document.querySelector('#pr-table-body');
+            
+            // 保存选中状态
+            const wasSelected = row.classList.contains('selected');
+            
+            // 移除更新状态
+            row.classList.remove('updating');
+            const updateIcon = row.querySelector('.updating-icon');
+            if (updateIcon) {
+                updateIcon.remove();
+            }
+            
+            // 创建新行来替换旧行
+            const tempContainer = document.createElement('div');
+            tempContainer.innerHTML = '<table><tbody></tbody></table>';
+            const tempTbody = tempContainer.querySelector('tbody');
+            
+            // 使用现有的addPRToTable逻辑创建新行
+            addPRToTable(prData, tempTbody);
+            const newRow = tempTbody.firstChild;
+            
+            // 复制新行的内容到现有行
+            if (newRow) {
+                row.innerHTML = newRow.innerHTML;
+                // 复制属性
+                ['data-platform', 'data-owner', 'data-repo', 'data-pr-id'].forEach(attr => {
+                    if (newRow.hasAttribute(attr)) {
+                        row.setAttribute(attr, newRow.getAttribute(attr));
+                    }
+                });
+                
+                // 恢复选中状态
+                if (wasSelected) {
+                    row.classList.add('selected');
+                }
+            }
+        }
+
+        // 更新或添加错误行
+        function updateOrAddErrorRow(errorData) {
+            const cacheKey = `${errorData.platform || 'gitee'}:${errorData.owner}/${errorData.repo}#${errorData.pr_id}`;
+            const existingRow = findRowByCacheKey(cacheKey);
+            
+            if (existingRow) {
+                // 更新现有行为错误状态
+                existingRow.classList.remove('updating');
+                existingRow.classList.add('table-warning');
+                
+                // 移除更新图标
+                const updateIcon = existingRow.querySelector('.updating-icon');
+                if (updateIcon) {
+                    updateIcon.remove();
+                }
+                
+                // 更新行内容为错误信息
+                existingRow.innerHTML = `
+                    <td>${errorData.platform || 'gitee'}</td>
+                    <td>${errorData.owner}/${errorData.repo}</td>
+                    <td>#${errorData.pr_id}</td>
+                    <td colspan="5" class="text-danger">加载失败: ${errorData.error}</td>
+                    <td>
+                        <button class="btn btn-danger btn-sm delete-pr-btn" 
+                                data-platform="${errorData.platform || 'gitee'}"
+                                data-owner="${errorData.owner}" 
+                                data-repo="${errorData.repo}" 
+                                data-pr-id="${errorData.pr_id}">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
+                                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                            </svg>
+                        </button>
+                    </td>
+                `;
+            } else {
+                // 添加新的错误行
+                const tableBody = document.querySelector('#pr-table-body');
                 const row = document.createElement('tr');
                 row.className = 'table-warning';
+                row.setAttribute('data-platform', errorData.platform || 'gitee');
+                row.setAttribute('data-owner', errorData.owner);
+                row.setAttribute('data-repo', errorData.repo);
+                row.setAttribute('data-pr-id', errorData.pr_id);
                 row.innerHTML = `
                     <td>${errorData.platform || 'gitee'}</td>
                     <td>${errorData.owner}/${errorData.repo}</td>
@@ -376,6 +698,57 @@
                     </td>
                 `;
                 tableBody.appendChild(row);
+            }
+        }
+
+        // 移除所有标记为"正在更新"但没有收到新数据的行（表示这些PR已经不在监控列表中了）
+        function removeOutdatedRows() {
+            const tableBody = document.querySelector('#pr-table-body');
+            const updatingRows = tableBody.querySelectorAll('tr.updating');
+            
+            updatingRows.forEach(row => {
+                row.remove();
+            });
+        }
+
+        // 流式更新监控中的PR标签（使用SSE）
+        function updatePRLabelsStream() {
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const loadingText = document.getElementById('loading-text');
+            const loadingProgress = document.getElementById('loading-progress');
+            const tableBody = document.querySelector('#pr-table-body');
+            
+            // 显示加载指示器
+            loadingIndicator.classList.remove('d-none');
+            loadingText.textContent = '正在刷新PR数据...';
+            loadingProgress.style.width = '0%';
+            
+            // 标记所有现有行为"正在更新"状态，而不是清空
+            markAllRowsAsUpdating();
+            
+            // 创建EventSource连接
+            const eventSource = new EventSource('/api/pr_labels_stream');
+            
+            eventSource.onopen = function() {
+                console.log('SSE连接已建立');
+            };
+            
+            eventSource.addEventListener('start', function(event) {
+                const data = JSON.parse(event.data);
+                loadingText.textContent = `正在刷新 ${data.total} 个PR的数据...`;
+            });
+            
+            eventSource.addEventListener('pr_data', function(event) {
+                const prData = JSON.parse(event.data);
+                updateOrAddPRToTable(prData);
+            });
+            
+            eventSource.addEventListener('pr_error', function(event) {
+                const errorData = JSON.parse(event.data);
+                console.error(`加载PR数据失败 ${errorData.cache_key}:`, errorData.error);
+                
+                // 更新对应行为错误状态，如果不存在则添加新行
+                updateOrAddErrorRow(errorData);
             });
             
             eventSource.addEventListener('progress', function(event) {
@@ -385,10 +758,16 @@
             });
             
             eventSource.addEventListener('complete', function(event) {
+                // 移除所有仍在"正在更新"状态的行（这些PR已经不在监控列表中了）
+                removeOutdatedRows();
+                
                 loadingIndicator.classList.add('d-none');
                 eventSource.close();
-                console.log('所有PR数据加载完成');
-                showMessage('PR数据加载完成', 'success');
+                console.log('所有PR数据刷新完成');
+                showMessage('PR数据刷新完成', 'success');
+                
+                // 应用标签颜色
+                applyLabelColors();
             });
             
             eventSource.onerror = function(event) {
@@ -402,15 +781,21 @@
         // 传统方式更新监控中的PR标签（作为备用）
         function updatePRLabels() {
             const tableBody = document.querySelector('#pr-table-body');
-            tableBody.innerHTML = '';
+            
+            // 标记所有现有行为"正在更新"状态
+            markAllRowsAsUpdating();
             
             fetch('/api/pr_labels')
                 .then(response => response.json())
                 .then(data => {
                     for (const cacheKey in data) {
                         const prInfo = data[cacheKey];
-                        addPRToTable(prInfo);
+                        updateOrAddPRToTable(prInfo);
                     }
+                    
+                    // 移除所有仍在"正在更新"状态的行
+                    removeOutdatedRows();
+                    
                     // 应用标签颜色
                     applyLabelColors();
                 })
@@ -518,11 +903,26 @@
                 addPrForm.addEventListener('submit', handleAddPRForm);
             }
 
+            // 表格行点击事件（多选功能）
+            document.addEventListener('click', function(e) {
+                const row = e.target.closest('#pr-table-body tr');
+                if (row) {
+                    // 检查是否点击的是删除按钮或链接
+                    const deleteBtn = e.target.closest('.delete-pr-btn');
+                    const link = e.target.closest('a');
+                    
+                    if (!deleteBtn && !link) {
+                        toggleRowSelection(row, e);
+                    }
+                }
+            });
+
             // 删除PR按钮点击事件（使用事件委托）
             document.addEventListener('click', function(e) {
                 const deleteBtn = e.target.closest('.delete-pr-btn');
                 if (deleteBtn) {
                     e.preventDefault();
+                    e.stopPropagation(); // 阻止冒泡到行点击事件
                     // 创建一个模拟事件对象，currentTarget指向删除按钮
                     const mockEvent = { currentTarget: deleteBtn };
                     handleDeletePR(mockEvent);
@@ -534,10 +934,26 @@
             if (refreshAllBtn) {
                 refreshAllBtn.addEventListener('click', refreshAllData);
             }
-            
-            const refreshBtn = document.getElementById('refresh-btn');
-            if (refreshBtn) {
-                refreshBtn.addEventListener('click', refreshAllData);
+
+            // 批量操作按钮事件
+            const selectAllBtn = document.getElementById('select-all-btn');
+            if (selectAllBtn) {
+                selectAllBtn.addEventListener('click', selectAllRows);
+            }
+
+            const clearSelectionBtn = document.getElementById('clear-selection-btn');
+            if (clearSelectionBtn) {
+                clearSelectionBtn.addEventListener('click', clearSelection);
+            }
+
+            const batchDeleteBtn = document.getElementById('batch-delete-btn');
+            if (batchDeleteBtn) {
+                batchDeleteBtn.addEventListener('click', batchDeletePRs);
+            }
+
+            const batchRefreshBtn = document.getElementById('batch-refresh-btn');
+            if (batchRefreshBtn) {
+                batchRefreshBtn.addEventListener('click', batchRefreshPRs);
             }
         }
 
