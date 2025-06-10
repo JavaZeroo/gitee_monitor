@@ -13,6 +13,8 @@ from ..api.api_client_factory import APIClientFactory
 from ..api.base_api import BaseAPIClient
 from ..models import PullRequest
 from ..config.config_manager import Config
+from .automation_engine import AutomationEngine, AutomationConfig
+from ..models.automation import TriggerType
 
 # 确保API客户端已注册到工厂
 from ..api import gitee_api
@@ -187,6 +189,16 @@ class PRMonitor:
         self.running = False
         self.poll_thread = None
         
+        # 初始化自动化引擎
+        automation_config = AutomationConfig(
+            enabled=self.config.get("AUTOMATION_ENABLED", True),
+            max_parallel_executions=self.config.get("AUTOMATION_MAX_PARALLEL", 3),
+            default_cooldown=self.config.get("AUTOMATION_DEFAULT_COOLDOWN", 300),
+            storage_path=self.config.get("AUTOMATION_STORAGE_PATH", "automation")
+        )
+        self.automation_engine = AutomationEngine(self.api_clients, automation_config)
+        logger.info("自动化引擎已初始化")
+        
     def _get_api_client(self, platform: str) -> Optional[BaseAPIClient]:
         """
         根据平台获取相应的API客户端
@@ -220,6 +232,11 @@ class PRMonitor:
         # 关闭线程池
         if self.thread_pool:
             self.thread_pool.shutdown(wait=True)
+        
+        # 关闭自动化引擎
+        if hasattr(self, 'automation_engine'):
+            self.automation_engine.shutdown()
+        
         logger.info("PR 监控服务已停止")
     
     @rate_limit(calls_per_second=1.5)  # 限制每秒1.5次调用
@@ -509,7 +526,7 @@ class PRMonitor:
         
         # 如果不在监控列表中，则添加
         if not is_monitored:
-            self.config.add_pr(owner, repo, pr.number, platform)
+            self.add_pr_to_monitor(platform, owner, repo, pr.number)
             logger.info(f"自动添加关注作者的 {platform} PR #{pr.number} ({owner}/{repo}) 到监控列表")
     
     def _poll_loop(self) -> None:
@@ -616,7 +633,126 @@ class PRMonitor:
         message = f"{platform.upper()} PR #{pr_id} ({owner}/{repo}) 标签变化: {' '.join(change_str)}"
         logger.info(message)
         
+        # 触发自动化规则
+        self._trigger_automation(TriggerType.LABEL_CHANGED.value, platform, owner, repo, pr_id, {
+            'added_labels': list(added),
+            'removed_labels': list(removed)
+        })
+        
         # TODO: 实现实际的通知功能，如邮件、Webhook 等
+    
+    def _trigger_automation(self, event_type: str, platform: str, owner: str, repo: str, pr_id: int, extra_context: dict = None) -> None:
+        """
+        触发自动化规则
+        
+        Args:
+            event_type: 事件类型
+            platform: 平台名称
+            owner: 仓库拥有者
+            repo: 仓库名称
+            pr_id: PR ID
+            extra_context: 额外的上下文信息
+        """
+        try:
+            # 获取PR详细信息
+            pr = self.get_pr_details(platform, owner, repo, pr_id)
+            if not pr:
+                logger.warning(f"无法获取PR详情进行自动化处理: {platform}:{owner}/{repo}#{pr_id}")
+                return
+            
+            # 转换为API格式的数据
+            pr_data = pr.to_dict()
+            
+            # 构建上下文
+            context = {
+                'platform': platform,
+                'event_type': event_type,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            if extra_context:
+                context.update(extra_context)
+            
+            # 触发自动化引擎处理
+            executed_rules = self.automation_engine.process_event(event_type, pr_data, context)
+            
+            if executed_rules:
+                logger.info(f"为事件 {event_type} 执行了 {len(executed_rules)} 个自动化规则: {executed_rules}")
+            
+        except Exception as e:
+            logger.error(f"触发自动化规则时出错: {e}")
+    
+    def add_pr_to_monitor(self, platform: str, owner: str, repo: str, pr_id: int) -> bool:
+        """
+        添加PR到监控列表并触发自动化
+        
+        Args:
+            platform: 平台名称
+            owner: 仓库拥有者
+            repo: 仓库名称
+            pr_id: PR ID
+            
+        Returns:
+            是否添加成功
+        """
+        try:
+            # 添加到配置
+            success = self.config.add_pr(owner, repo, pr_id, platform)
+            
+            if success:
+                logger.info(f"成功添加PR到监控列表: {platform}:{owner}/{repo}#{pr_id}")
+                
+                # 触发PR添加事件
+                self._trigger_automation(TriggerType.PR_ADDED.value, platform, owner, repo, pr_id)
+                
+                return True
+            else:
+                logger.warning(f"PR已存在于监控列表中: {platform}:{owner}/{repo}#{pr_id}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"添加PR到监控列表失败: {e}")
+            return False
+    
+    def remove_pr_from_monitor(self, platform: str, owner: str, repo: str, pr_id: int) -> bool:
+        """
+        从监控列表中移除PR
+        
+        Args:
+            platform: 平台名称
+            owner: 仓库拥有者
+            repo: 仓库名称
+            pr_id: PR ID
+            
+        Returns:
+            是否移除成功
+        """
+        try:
+            success = self.config.remove_pr(owner, repo, pr_id, platform)
+            
+            if success:
+                logger.info(f"成功从监控列表移除PR: {platform}:{owner}/{repo}#{pr_id}")
+                
+                # 清理缓存
+                cache_key = f"{platform}:{owner}/{repo}#{pr_id}"
+                if cache_key in self.pr_labels:
+                    del self.pr_labels[cache_key]
+                
+                self.cache.invalidate(cache_key)
+                self.cache.invalidate(f"{cache_key}_details")
+                
+                return True
+            else:
+                logger.warning(f"PR不在监控列表中: {platform}:{owner}/{repo}#{pr_id}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"从监控列表移除PR失败: {e}")
+            return False
+    
+    def get_automation_engine(self):
+        """获取自动化引擎实例"""
+        return self.automation_engine
     
     def get_multiple_pr_details(self, pr_list: List[Dict[str, Any]], force_refresh: bool = False) -> List[Optional[PullRequest]]:
         """

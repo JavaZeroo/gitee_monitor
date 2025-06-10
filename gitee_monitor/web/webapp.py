@@ -495,6 +495,127 @@ class WebApp:
                 logger.error(f"更新性能配置时出错: {e}")
                 return jsonify({'success': False, 'error': f'更新性能配置失败: {str(e)}'}), 500
         
+        # 自动化规则管理页面
+        @self.app.route('/automation')
+        def automation_page():
+            return render_template('automation.html')
+        
+        # 自动化规则API端点
+        @self.app.route('/api/automation/rules', methods=['GET'])
+        def api_get_automation_rules():
+            try:
+                automation_engine = self.pr_monitor.get_automation_engine()
+                rules = automation_engine.get_rules()
+                rules_data = [rule.to_dict() for rule in rules]
+                return jsonify(rules_data)
+            except Exception as e:
+                logger.error(f"获取自动化规则失败: {e}")
+                return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/api/automation/rules', methods=['POST'])
+        def api_create_automation_rule():
+            try:
+                data = request.get_json()
+                automation_engine = self.pr_monitor.get_automation_engine()
+                
+                # 生成规则ID
+                import uuid
+                rule_id = str(uuid.uuid4())[:8]
+                data['id'] = rule_id
+                
+                from ..models.automation import AutomationRule
+                rule = AutomationRule.from_dict(data)
+                
+                success = automation_engine.add_rule(rule)
+                if success:
+                    return jsonify({'success': True, 'rule_id': rule_id})
+                else:
+                    return jsonify({'error': '规则ID已存在'}), 400
+                    
+            except Exception as e:
+                logger.error(f"创建自动化规则失败: {e}")
+                return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/api/automation/rules/<rule_id>', methods=['PUT'])
+        def api_update_automation_rule(rule_id):
+            try:
+                data = request.get_json()
+                data['id'] = rule_id
+                
+                automation_engine = self.pr_monitor.get_automation_engine()
+                from ..models.automation import AutomationRule
+                rule = AutomationRule.from_dict(data)
+                
+                success = automation_engine.update_rule(rule)
+                if success:
+                    return jsonify({'success': True})
+                else:
+                    return jsonify({'error': '规则不存在'}), 404
+                    
+            except Exception as e:
+                logger.error(f"更新自动化规则失败: {e}")
+                return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/api/automation/rules/<rule_id>', methods=['DELETE'])
+        def api_delete_automation_rule(rule_id):
+            try:
+                automation_engine = self.pr_monitor.get_automation_engine()
+                success = automation_engine.remove_rule(rule_id)
+                
+                if success:
+                    return jsonify({'success': True})
+                else:
+                    return jsonify({'error': '规则不存在'}), 404
+                    
+            except Exception as e:
+                logger.error(f"删除自动化规则失败: {e}")
+                return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/api/automation/rules/<rule_id>/toggle', methods=['POST'])
+        def api_toggle_automation_rule(rule_id):
+            try:
+                automation_engine = self.pr_monitor.get_automation_engine()
+                rule = automation_engine.get_rule(rule_id)
+                
+                if not rule:
+                    return jsonify({'error': '规则不存在'}), 404
+                
+                rule.enabled = not rule.enabled
+                success = automation_engine.update_rule(rule)
+                
+                if success:
+                    return jsonify({'success': True, 'enabled': rule.enabled})
+                else:
+                    return jsonify({'error': '更新规则状态失败'}), 500
+                    
+            except Exception as e:
+                logger.error(f"切换自动化规则状态失败: {e}")
+                return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/api/automation/statistics', methods=['GET'])
+        def api_get_automation_statistics():
+            try:
+                automation_engine = self.pr_monitor.get_automation_engine()
+                stats = automation_engine.get_statistics()
+                return jsonify(stats)
+            except Exception as e:
+                logger.error(f"获取自动化统计失败: {e}")
+                return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/api/automation/history', methods=['GET'])
+        def api_get_automation_history():
+            try:
+                automation_engine = self.pr_monitor.get_automation_engine()
+                rule_id = request.args.get('rule_id')
+                limit = int(request.args.get('limit', 100))
+                
+                history = automation_engine.get_execution_history(rule_id, limit)
+                history_data = [record.to_dict() for record in history]
+                return jsonify(history_data)
+            except Exception as e:
+                logger.error(f"获取自动化执行历史失败: {e}")
+                return jsonify({'error': str(e)}), 500
+        
     def run(self, host: str = '0.0.0.0', port: int = 5000, debug: bool = False) -> None:
         """
         运行 Web 应用

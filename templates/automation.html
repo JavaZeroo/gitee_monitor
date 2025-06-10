@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自动化规则管理 - PR 监控</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Noto+Sans+SC:wght@300;400;700&display=swap" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/material.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">    <style>
+        .rule-card {
+            border-left: 4px solid #007bff;
+            margin-bottom: 1rem;
+            transition: box-shadow 0.15s ease-in-out;
+        }
+        .rule-card:hover {
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .rule-card.disabled {
+            border-left-color: #6c757d;
+            opacity: 0.7;
+        }
+        .rule-priority {
+            background-color: #007bff;
+            color: white;
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .condition-badge {
+            background-color: #28a745;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin: 2px;
+        }
+        .action-badge {
+            background-color: #dc3545;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin: 2px;
+        }
+        .execution-stats {
+            font-size: 12px;
+            color: #6c757d;
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+        }
+        .modal-lg {
+            max-width: 900px;
+        }
+        .condition-row, .action-row {
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background: #f8f9fa;
+        }
+        .time-range-inputs {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 页面头部 -->
+        <h1 class="mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" class="bi bi-robot me-2" viewBox="0 0 16 16">
+                <path d="M6 12.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5ZM3 8.062C3 6.76 4.235 5.765 5.53 5.886a26.58 26.58 0 0 0 4.94 0C11.765 5.765 13 6.76 13 8.062v1.157a.933.933 0 0 1-.765.935c-.845.147-2.34.346-4.235.346-1.895 0-3.39-.2-4.235-.346A.933.933 0 0 1 3 9.219V8.062Zm4.542-.827a.25.25 0 0 0-.217.068l-.92.9a24.767 24.767 0 0 1-1.871-.183.25.25 0 0 0-.068.495c.55.076 1.232.149 2.02.193a.25.25 0 0 0 .189-.071l.754-.736.847 1.71a.25.25 0 0 0 .404.062l.932-.97a25.286 25.286 0 0 0 1.922-.188.25.25 0 0 0-.068-.495c-.538.074-1.207.145-1.98.189a.25.25 0 0 0-.166.076l-.754.785-.842-1.70a.25.25 0 0 0-.182-.135Z"/>
+                <path d="M8.5 1.866a1 1 0 1 0-1 0V3h-2A4.5 4.5 0 0 0 1 7.5V8a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1v1a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1v-.5A4.5 4.5 0 0 0 10.5 3h-2V1.866ZM14 7.5V13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V7.5A3.5 3.5 0 0 1 5.5 4h5A3.5 3.5 0 0 1 14 7.5Z"/>
+            </svg>
+            自动化规则管理
+        </h1>
+
+        <!-- 导航链接 -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <a href="{{ url_for('index') }}" class="btn btn-secondary me-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left me-1" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+                    </svg>
+                    返回监控页面
+                </a>
+                <a href="{{ url_for('config_page') }}" class="btn btn-primary me-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-gear me-1" viewBox="0 0 16 16">
+                        <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
+                        <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/>
+                    </svg>
+                    系统配置
+                </a>
+            </div>            <div>
+                <button class="btn btn-info me-2" onclick="showHistoryModal()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clock-history me-1" viewBox="0 0 16 16">
+                        <path d="M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022l-.074.997zm2.004.45a7.003 7.003 0 0 0-.985-.299l.219-.976c.383.086.76.2 1.126.342l-.36.933zm1.37.71a7.01 7.01 0 0 0-.439-.27l.493-.87a8.025 8.025 0 0 1 .979.654l-.615.789a6.996 6.996 0 0 0-.418-.302zm1.834 1.79a6.99 6.99 0 0 0-.653-.796l.724-.69c.27.285.52.59.747.91l-.818.576zm.744 1.352a7.08 7.08 0 0 0-.214-.468l.893-.45a7.976 7.976 0 0 1 .45 1.088l-.95.313a7.023 7.023 0 0 0-.179-.483zm.53 2.507a6.991 6.991 0 0 0-.1-1.025l.985-.17c.067.386.106.778.116 1.17l-1.001.025zm-.131 1.538c.033-.17.06-.339.081-.51l.993.123a7.957 7.957 0 0 1-.23 1.155l-.964-.267c.046-.165.086-.332.12-.501zm-.952 2.379c.184-.29.346-.594.486-.908l.914.405c-.16.36-.345.706-.555 1.038l-.845-.535zm-.964 1.205c.122-.122.239-.248.35-.378l.758.653a8.073 8.073 0 0 1-.401.432l-.707-.707z"/>
+                        <path d="M8 1a7 7 0 1 0 4.95 11.95l.707.707A8.001 8.001 0 1 1 8 0v1z"/>
+                        <path d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.248 1.856a.5.5 0 0 1-.496.868l-3.5-2A.5.5 0 0 1 7 9V3.5a.5.5 0 0 1 .5-.5z"/>
+                    </svg>
+                    执行历史
+                </button>
+                <button class="btn btn-secondary me-2" onclick="refreshData()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-clockwise me-1" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+                        <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+                    </svg>
+                    刷新
+                </button>
+                <button class="btn btn-success" onclick="showRuleModal()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-plus-circle me-1" viewBox="0 0 16 16">
+                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                        <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                    </svg>
+                    创建规则
+                </button>
+            </div>
+        </div>        <!-- 统计卡片 -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">总规则数</h5>
+                        <h3 class="text-primary" id="total-rules">0</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">启用规则</h5>
+                        <h3 class="text-success" id="enabled-rules">0</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">总执行次数</h5>
+                        <h3 class="text-info" id="total-executions">0</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">成功率</h5>
+                        <h3 class="text-warning" id="success-rate">0%</h3>
+                    </div>
+                </div>
+            </div>
+        </div>        <!-- 规则列表 -->
+        <div class="row">
+            <div class="col-12">
+                <div id="rules-container">
+                    <!-- 规则卡片将在这里动态生成 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 规则编辑模态框 -->
+    <div class="modal fade" id="rule-modal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="rule-modal-title">添加规则</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="rule-form">
+                        <!-- 基本信息 -->
+                        <div class="row mb-3">
+                            <div class="col-md-8">
+                                <label class="form-label">规则名称 *</label>
+                                <input type="text" class="form-control" id="rule-name" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">优先级</label>
+                                <input type="number" class="form-control" id="rule-priority" value="0" min="0" max="100">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">规则描述</label>
+                            <textarea class="form-control" id="rule-description" rows="2"></textarea>
+                        </div>
+
+                        <!-- 触发器 -->
+                        <div class="mb-3">
+                            <label class="form-label">触发器 *</label>
+                            <select class="form-control" id="rule-trigger" required>
+                                <option value="">请选择触发器</option>
+                                <option value="pr_added">PR被添加到监控</option>
+                                <option value="pr_updated">PR状态更新</option>
+                                <option value="label_changed">标签变化</option>
+                                <option value="status_changed">状态变化</option>
+                                <option value="scheduled">定时触发</option>
+                                <option value="manual">手动触发</option>
+                            </select>
+                        </div>
+
+                        <!-- 条件 -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <label class="form-label">执行条件</label>
+                                <button type="button" class="btn btn-sm btn-success" id="add-condition-btn">
+                                    <i class="fas fa-plus"></i> 添加条件
+                                </button>
+                            </div>
+                            <div id="conditions-container">
+                                <!-- 条件将在这里动态生成 -->
+                            </div>
+                        </div>
+
+                        <!-- 动作 -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <label class="form-label">执行动作 *</label>
+                                <button type="button" class="btn btn-sm btn-danger" id="add-action-btn">
+                                    <i class="fas fa-plus"></i> 添加动作
+                                </button>
+                            </div>
+                            <div id="actions-container">
+                                <!-- 动作将在这里动态生成 -->
+                            </div>
+                        </div>
+
+                        <!-- 高级选项 -->
+                        <div class="accordion mb-3" id="advanced-accordion">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#advanced-options">
+                                        高级选项
+                                    </button>
+                                </h2>
+                                <div id="advanced-options" class="accordion-collapse collapse">
+                                    <div class="accordion-body">
+                                        <!-- 时间范围 -->
+                                        <div class="mb-3">
+                                            <label class="form-label">生效时间范围</label>
+                                            <div class="time-range-inputs">
+                                                <input type="time" class="form-control" id="time-start" placeholder="开始时间">
+                                                <span>到</span>
+                                                <input type="time" class="form-control" id="time-end" placeholder="结束时间">
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- 冷却时间和执行限制 -->
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <label class="form-label">冷却时间（秒）</label>
+                                                <input type="number" class="form-control" id="rule-cooldown" value="0" min="0">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">每日最大执行次数</label>
+                                                <input type="number" class="form-control" id="max-executions" min="1">
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- 标签 -->
+                                        <div class="mt-3">
+                                            <label class="form-label">标签（用空格分隔）</label>
+                                            <input type="text" class="form-control" id="rule-tags" placeholder="例如: 构建 自动化 通知">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 启用状态 -->
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="rule-enabled" checked>
+                            <label class="form-check-label" for="rule-enabled">
+                                启用此规则
+                            </label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="save-rule-btn">保存规则</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 执行历史模态框 -->
+    <div class="modal fade" id="history-modal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">执行历史</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>执行时间</th>
+                                    <th>规则</th>
+                                    <th>平台</th>
+                                    <th>PR</th>
+                                    <th>动作</th>
+                                    <th>状态</th>
+                                    <th>耗时</th>
+                                    <th>错误信息</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-table-body">
+                                <!-- 执行历史将在这里显示 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let rules = [];
+        let editingRuleId = null;
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadRules();
+            loadStatistics();
+            initEventHandlers();
+        });        // 初始化事件处理器
+        function initEventHandlers() {
+            document.getElementById('save-rule-btn').addEventListener('click', saveRule);
+            document.getElementById('add-condition-btn').addEventListener('click', addCondition);
+            document.getElementById('add-action-btn').addEventListener('click', addAction);
+        }
+
+        // 刷新数据
+        function refreshData() {
+            loadRules();
+            loadStatistics();
+        }
+
+        // 加载规则列表
+        async function loadRules() {
+            try {
+                const response = await fetch('/api/automation/rules');
+                if (response.ok) {
+                    rules = await response.json();
+                    renderRules();
+                } else {
+                    console.error('Failed to load rules');
+                }
+            } catch (error) {
+                console.error('Error loading rules:', error);
+            }
+        }
+
+        // 加载统计信息
+        async function loadStatistics() {
+            try {
+                const response = await fetch('/api/automation/statistics');
+                if (response.ok) {
+                    const stats = await response.json();
+                    document.getElementById('total-rules').textContent = stats.total_rules;
+                    document.getElementById('enabled-rules').textContent = stats.enabled_rules;
+                    document.getElementById('total-executions').textContent = stats.total_executions;
+                    document.getElementById('success-rate').textContent = (stats.success_rate * 100).toFixed(1) + '%';
+                }
+            } catch (error) {
+                console.error('Error loading statistics:', error);
+            }
+        }
+
+        // 渲染规则列表
+        function renderRules() {
+            const container = document.getElementById('rules-container');
+            container.innerHTML = '';
+
+            rules.forEach(rule => {
+                const ruleCard = createRuleCard(rule);
+                container.appendChild(ruleCard);
+            });
+        }
+
+        // 创建规则卡片
+        function createRuleCard(rule) {
+            const card = document.createElement('div');
+            card.className = `card rule-card ${rule.enabled ? '' : 'disabled'}`;
+            
+            const conditions = rule.conditions.map(c => 
+                `<span class="condition-badge">${c.type}: ${c.value}</span>`
+            ).join('');
+            
+            const actions = rule.actions.map(a => 
+                `<span class="action-badge">${a.type}</span>`
+            ).join('');
+            
+            const lastExecuted = rule.last_executed 
+                ? new Date(rule.last_executed).toLocaleString() 
+                : '从未执行';
+                
+            card.innerHTML = `
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="rule-priority me-2">${rule.priority}</div>
+                                <h5 class="card-title mb-0">${rule.name}</h5>
+                                <span class="badge ${rule.enabled ? 'bg-success' : 'bg-secondary'} ms-2">
+                                    ${rule.enabled ? '启用' : '禁用'}
+                                </span>
+                            </div>
+                            <p class="card-text text-muted">${rule.description || '无描述'}</p>
+                            <div class="mb-2">
+                                <strong>触发器:</strong> 
+                                <span class="badge bg-info">${getTriggerDisplayName(rule.trigger)}</span>
+                            </div>
+                            <div class="mb-2">
+                                <strong>条件:</strong> ${conditions || '<span class="text-muted">无条件</span>'}
+                            </div>
+                            <div class="mb-2">
+                                <strong>动作:</strong> ${actions}
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="execution-stats mb-2">
+                                <div>执行: ${rule.execution_count} 次</div>
+                                <div>成功: ${rule.success_count} 次</div>
+                                <div>失败: ${rule.failure_count} 次</div>
+                                <div>最后执行: ${lastExecuted}</div>
+                            </div>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-outline-primary" onclick="editRule('${rule.id}')">
+                                    <i class="fas fa-edit"></i> 编辑
+                                </button>
+                                <button class="btn btn-sm btn-outline-${rule.enabled ? 'warning' : 'success'}" 
+                                        onclick="toggleRule('${rule.id}')">
+                                    <i class="fas fa-${rule.enabled ? 'pause' : 'play'}"></i> 
+                                    ${rule.enabled ? '禁用' : '启用'}
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteRule('${rule.id}')">
+                                    <i class="fas fa-trash"></i> 删除
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            return card;
+        }
+
+        // 获取触发器显示名称
+        function getTriggerDisplayName(trigger) {
+            const names = {
+                'pr_added': 'PR被添加',
+                'pr_updated': 'PR更新',
+                'label_changed': '标签变化',
+                'status_changed': '状态变化',
+                'scheduled': '定时触发',
+                'manual': '手动触发'
+            };
+            return names[trigger] || trigger;
+        }
+
+        // 显示规则编辑模态框
+        function showRuleModal(ruleId = null) {
+            editingRuleId = ruleId;
+            const modal = new bootstrap.Modal(document.getElementById('rule-modal'));
+            
+            if (ruleId) {
+                // 编辑模式
+                const rule = rules.find(r => r.id === ruleId);
+                if (rule) {
+                    fillRuleForm(rule);
+                    document.getElementById('rule-modal-title').textContent = '编辑规则';
+                }
+            } else {
+                // 新建模式
+                clearRuleForm();
+                document.getElementById('rule-modal-title').textContent = '添加规则';
+            }
+            
+            modal.show();
+        }
+
+        // 填充规则表单
+        function fillRuleForm(rule) {
+            document.getElementById('rule-name').value = rule.name;
+            document.getElementById('rule-description').value = rule.description || '';
+            document.getElementById('rule-trigger').value = rule.trigger;
+            document.getElementById('rule-priority').value = rule.priority;
+            document.getElementById('rule-enabled').checked = rule.enabled;
+            document.getElementById('rule-cooldown').value = rule.cooldown;
+            document.getElementById('max-executions').value = rule.max_executions_per_day || '';
+            document.getElementById('rule-tags').value = rule.tags ? rule.tags.join(' ') : '';
+            
+            if (rule.time_range) {
+                document.getElementById('time-start').value = rule.time_range.start;
+                document.getElementById('time-end').value = rule.time_range.end;
+            }
+            
+            // 填充条件
+            const conditionsContainer = document.getElementById('conditions-container');
+            conditionsContainer.innerHTML = '';
+            rule.conditions.forEach(condition => {
+                addCondition(condition);
+            });
+            
+            // 填充动作
+            const actionsContainer = document.getElementById('actions-container');
+            actionsContainer.innerHTML = '';
+            rule.actions.forEach(action => {
+                addAction(action);
+            });
+        }
+
+        // 清空规则表单
+        function clearRuleForm() {
+            document.getElementById('rule-form').reset();
+            document.getElementById('conditions-container').innerHTML = '';
+            document.getElementById('actions-container').innerHTML = '';
+            document.getElementById('rule-enabled').checked = true;
+        }
+
+        // 添加条件
+        function addCondition(condition = null) {
+            const container = document.getElementById('conditions-container');
+            const conditionDiv = document.createElement('div');
+            conditionDiv.className = 'condition-row';
+            
+            const conditionId = 'condition_' + Date.now() + Math.random();
+            
+            conditionDiv.innerHTML = `
+                <div class="row">
+                    <div class="col-md-3">
+                        <select class="form-control condition-type" name="condition_type">
+                            <option value="">选择条件类型</option>
+                            <option value="has_label">包含标签</option>
+                            <option value="not_has_label">不包含标签</option>
+                            <option value="status_is">状态是</option>
+                            <option value="author_is">作者是</option>
+                            <option value="platform_is">平台是</option>
+                            <option value="repo_is">仓库是</option>
+                            <option value="title_contains">标题包含</option>
+                            <option value="is_draft">是草稿</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-control condition-operator" name="condition_operator">
+                            <option value="eq">等于</option>
+                            <option value="ne">不等于</option>
+                            <option value="contains">包含</option>
+                            <option value="not_contains">不包含</option>
+                            <option value="in">在列表中</option>
+                            <option value="matches">匹配正则</option>
+                        </select>
+                    </div>
+                    <div class="col-md-5">
+                        <input type="text" class="form-control condition-value" name="condition_value" placeholder="条件值">
+                    </div>
+                    <div class="col-md-1">
+                        <button type="button" class="btn btn-sm btn-danger" onclick="this.parentElement.parentElement.parentElement.remove()">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            if (condition) {
+                conditionDiv.querySelector('.condition-type').value = condition.type;
+                conditionDiv.querySelector('.condition-operator').value = condition.operator;
+                conditionDiv.querySelector('.condition-value').value = condition.value;
+            }
+            
+            container.appendChild(conditionDiv);
+        }
+
+        // 添加动作
+        function addAction(action = null) {
+            const container = document.getElementById('actions-container');
+            const actionDiv = document.createElement('div');
+            actionDiv.className = 'action-row';
+            
+            actionDiv.innerHTML = `
+                <div class="row">
+                    <div class="col-md-3">
+                        <select class="form-control action-type" name="action_type" onchange="updateActionParameters(this)">
+                            <option value="">选择动作类型</option>
+                            <option value="comment">添加评论</option>
+                            <option value="add_label">添加标签</option>
+                            <option value="remove_label">移除标签</option>
+                            <option value="close_pr">关闭PR</option>
+                            <option value="webhook">调用Webhook</option>
+                            <option value="log">记录日志</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" class="form-control action-delay" name="action_delay" placeholder="延迟(秒)" value="0" min="0">
+                    </div>
+                    <div class="col-md-6">
+                        <div class="action-parameters">
+                            <!-- 动作参数将根据类型动态生成 -->
+                        </div>
+                    </div>
+                    <div class="col-md-1">
+                        <button type="button" class="btn btn-sm btn-danger" onclick="this.parentElement.parentElement.parentElement.remove()">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            if (action) {
+                actionDiv.querySelector('.action-type').value = action.type;
+                actionDiv.querySelector('.action-delay').value = action.delay || 0;
+                updateActionParameters(actionDiv.querySelector('.action-type'));
+                
+                // 填充参数
+                const parametersContainer = actionDiv.querySelector('.action-parameters');
+                if (action.type === 'comment') {
+                    parametersContainer.querySelector('textarea').value = action.parameters.message || '';
+                } else if (action.type === 'add_label' || action.type === 'remove_label') {
+                    parametersContainer.querySelector('input').value = action.parameters.labels ? action.parameters.labels.join(', ') : '';
+                } else if (action.type === 'webhook') {
+                    parametersContainer.querySelector('input[placeholder="URL"]').value = action.parameters.url || '';
+                    parametersContainer.querySelector('select').value = action.parameters.method || 'POST';
+                } else if (action.type === 'log') {
+                    parametersContainer.querySelector('textarea').value = action.parameters.message || '';
+                    parametersContainer.querySelector('select').value = action.parameters.level || 'INFO';
+                }
+            }
+            
+            container.appendChild(actionDiv);
+        }
+
+        // 更新动作参数
+        function updateActionParameters(selectElement) {
+            const actionType = selectElement.value;
+            const parameterContainer = selectElement.closest('.action-row').querySelector('.action-parameters');
+            
+            let html = '';
+            
+            switch (actionType) {
+                case 'comment':
+                    html = '<textarea class="form-control" placeholder="评论内容" rows="2"></textarea>';
+                    break;
+                case 'add_label':
+                case 'remove_label':
+                    html = '<input type="text" class="form-control" placeholder="标签名称(用逗号分隔)">';
+                    break;
+                case 'webhook':
+                    html = `
+                        <div class="row">
+                            <div class="col-8">
+                                <input type="text" class="form-control" placeholder="URL">
+                            </div>
+                            <div class="col-4">
+                                <select class="form-control">
+                                    <option value="POST">POST</option>
+                                    <option value="GET">GET</option>
+                                    <option value="PUT">PUT</option>
+                                </select>
+                            </div>
+                        </div>
+                    `;
+                    break;
+                case 'log':
+                    html = `
+                        <div class="row">
+                            <div class="col-8">
+                                <textarea class="form-control" placeholder="日志消息" rows="2"></textarea>
+                            </div>
+                            <div class="col-4">
+                                <select class="form-control">
+                                    <option value="INFO">INFO</option>
+                                    <option value="WARNING">WARNING</option>
+                                    <option value="ERROR">ERROR</option>
+                                    <option value="DEBUG">DEBUG</option>
+                                </select>
+                            </div>
+                        </div>
+                    `;
+                    break;
+                default:
+                    html = '<input type="text" class="form-control" placeholder="参数" disabled>';
+            }
+            
+            parameterContainer.innerHTML = html;
+        }
+
+        // 保存规则
+        async function saveRule() {
+            const formData = collectFormData();
+            if (!formData) return;
+            
+            try {
+                const url = editingRuleId 
+                    ? `/api/automation/rules/${editingRuleId}` 
+                    : '/api/automation/rules';
+                const method = editingRuleId ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                if (response.ok) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('rule-modal'));
+                    modal.hide();
+                    loadRules();
+                    loadStatistics();
+                } else {
+                    const error = await response.text();
+                    alert('保存失败: ' + error);
+                }
+            } catch (error) {
+                console.error('Error saving rule:', error);
+                alert('保存失败: ' + error.message);
+            }
+        }
+
+        // 收集表单数据
+        function collectFormData() {
+            const name = document.getElementById('rule-name').value.trim();
+            const trigger = document.getElementById('rule-trigger').value;
+            
+            if (!name || !trigger) {
+                alert('请填写规则名称和触发器');
+                return null;
+            }
+            
+            // 收集条件
+            const conditions = [];
+            document.querySelectorAll('.condition-row').forEach(row => {
+                const type = row.querySelector('.condition-type').value;
+                const operator = row.querySelector('.condition-operator').value;
+                const value = row.querySelector('.condition-value').value;
+                
+                if (type && operator && value) {
+                    conditions.push({ type, operator, value });
+                }
+            });
+            
+            // 收集动作
+            const actions = [];
+            document.querySelectorAll('.action-row').forEach(row => {
+                const type = row.querySelector('.action-type').value;
+                const delay = parseInt(row.querySelector('.action-delay').value) || 0;
+                
+                if (type) {
+                    const parameters = {};
+                    const parameterContainer = row.querySelector('.action-parameters');
+                    
+                    switch (type) {
+                        case 'comment':
+                            parameters.message = parameterContainer.querySelector('textarea').value;
+                            break;
+                        case 'add_label':
+                        case 'remove_label':
+                            const labels = parameterContainer.querySelector('input').value.split(',').map(s => s.trim()).filter(s => s);
+                            parameters.labels = labels;
+                            break;
+                        case 'webhook':
+                            parameters.url = parameterContainer.querySelector('input').value;
+                            parameters.method = parameterContainer.querySelector('select').value;
+                            break;
+                        case 'log':
+                            parameters.message = parameterContainer.querySelector('textarea').value;
+                            parameters.level = parameterContainer.querySelector('select').value;
+                            break;
+                    }
+                    
+                    actions.push({ type, parameters, delay });
+                }
+            });
+            
+            if (actions.length === 0) {
+                alert('请至少添加一个动作');
+                return null;
+            }
+            
+            // 构建规则数据
+            const ruleData = {
+                name: name,
+                description: document.getElementById('rule-description').value.trim(),
+                trigger: trigger,
+                conditions: conditions,
+                actions: actions,
+                enabled: document.getElementById('rule-enabled').checked,
+                priority: parseInt(document.getElementById('rule-priority').value) || 0,
+                cooldown: parseInt(document.getElementById('rule-cooldown').value) || 0,
+                tags: document.getElementById('rule-tags').value.trim().split(/\s+/).filter(t => t)
+            };
+            
+            // 处理时间范围
+            const timeStart = document.getElementById('time-start').value;
+            const timeEnd = document.getElementById('time-end').value;
+            if (timeStart && timeEnd) {
+                ruleData.time_range = {
+                    start: timeStart + ':00',
+                    end: timeEnd + ':00'
+                };
+            }
+            
+            // 处理每日执行次数限制
+            const maxExecutions = document.getElementById('max-executions').value;
+            if (maxExecutions) {
+                ruleData.max_executions_per_day = parseInt(maxExecutions);
+            }
+            
+            return ruleData;
+        }
+
+        // 编辑规则
+        function editRule(ruleId) {
+            showRuleModal(ruleId);
+        }
+
+        // 切换规则启用状态
+        async function toggleRule(ruleId) {
+            const rule = rules.find(r => r.id === ruleId);
+            if (!rule) return;
+            
+            try {
+                const response = await fetch(`/api/automation/rules/${ruleId}/toggle`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    loadRules();
+                    loadStatistics();
+                } else {
+                    alert('操作失败');
+                }
+            } catch (error) {
+                console.error('Error toggling rule:', error);
+                alert('操作失败: ' + error.message);
+            }
+        }
+
+        // 删除规则
+        async function deleteRule(ruleId) {
+            const rule = rules.find(r => r.id === ruleId);
+            if (!rule) return;
+            
+            if (!confirm(`确定要删除规则 "${rule.name}" 吗？`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/automation/rules/${ruleId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    loadRules();
+                    loadStatistics();
+                } else {
+                    alert('删除失败');
+                }
+            } catch (error) {
+                console.error('Error deleting rule:', error);
+                alert('删除失败: ' + error.message);
+            }
+        }
+
+        // 显示执行历史
+        async function showHistoryModal() {
+            try {
+                const response = await fetch('/api/automation/history');
+                if (response.ok) {
+                    const history = await response.json();
+                    renderHistory(history);
+                    
+                    const modal = new bootstrap.Modal(document.getElementById('history-modal'));
+                    modal.show();
+                }
+            } catch (error) {
+                console.error('Error loading history:', error);
+            }
+        }
+
+        // 渲染执行历史
+        function renderHistory(history) {
+            const tbody = document.getElementById('history-table-body');
+            tbody.innerHTML = '';
+            
+            history.forEach(record => {
+                const row = document.createElement('tr');
+                row.className = record.success ? 'table-success' : 'table-danger';
+                
+                const executedAt = new Date(record.executed_at).toLocaleString();
+                const ruleName = rules.find(r => r.id === record.rule_id)?.name || record.rule_id;
+                const prInfo = record.pr_info;
+                const actionsText = record.actions_executed.join(', ');
+                const statusText = record.success ? '成功' : '失败';
+                const executionTime = record.execution_time.toFixed(2) + 's';
+                const errorMessage = record.error_message || '-';
+                
+                row.innerHTML = `
+                    <td>${executedAt}</td>
+                    <td>${ruleName}</td>
+                    <td>${prInfo.platform}</td>
+                    <td><a href="${prInfo.url || '#'}" target="_blank">${prInfo.repo}#${prInfo.pr_number}</a></td>
+                    <td>${actionsText}</td>
+                    <td>${statusText}</td>
+                    <td>${executionTime}</td>
+                    <td>${errorMessage}</td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+    </script>
+</body>
+</html>

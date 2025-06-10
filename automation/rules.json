@@ -1,0 +1,76 @@
+[
+  {
+    "id": "auto-build-new-pr",
+    "name": "【示例】新PR自动构建",
+    "description": "当有新PR添加时自动触发构建",
+    "trigger": "pr_added",
+    "conditions": [
+      {
+        "type": "platform_is",
+        "operator": "eq",
+        "value": "gitee",
+        "field": null
+      }
+    ],
+    "actions": [
+      {
+        "type": "comment",
+        "parameters": {
+          "message": "/build"
+        },
+        "delay": 0,
+        "retry_count": 0,
+        "retry_interval": 60
+      }
+    ],
+    "enabled": false,
+    "priority": 0,
+    "time_range": null,
+    "cooldown": 0,
+    "max_executions_per_day": null,
+    "tags": [],
+    "created_at": "2025-06-10T14:58:06.545079",
+    "updated_at": "2025-06-10T15:12:47.186413",
+    "last_executed": null,
+    "execution_count": 0,
+    "success_count": 0,
+    "failure_count": 0
+  },
+  {
+    "id": "retest-failed-pipeline",
+    "name": "【示例】失败流水线重试",
+    "description": "检测到pipeline-failed标签时自动重试",
+    "trigger": "label_changed",
+    "conditions": [
+      {
+        "type": "has_label",
+        "operator": "contains",
+        "value": "pipeline-failed",
+        "field": null
+      }
+    ],
+    "actions": [
+      {
+        "type": "comment",
+        "parameters": {
+          "message": "/retest"
+        },
+        "delay": 300,
+        "retry_count": 0,
+        "retry_interval": 60
+      }
+    ],
+    "enabled": false,
+    "priority": 0,
+    "time_range": null,
+    "cooldown": 3600,
+    "max_executions_per_day": 3,
+    "tags": [],
+    "created_at": "2025-06-10T14:58:06.545079",
+    "updated_at": "2025-06-10T14:58:06.545079",
+    "last_executed": null,
+    "execution_count": 0,
+    "success_count": 0,
+    "failure_count": 0
+  }
+]
