@@ -218,52 +218,61 @@ body {
     text-overflow: ellipsis;
 }
 
+/* 使用类名选择器进行列宽控制，更加语义化和易维护 */
+
+/* 平台列 */
+.platform-col {
+    width: 8%;
+    min-width: 80px;
+    text-align: center;
+}
+
 /* 仓库列 */
-.table th:nth-child(1), .table td:nth-child(1) {
+.repo-col {
     width: 12%;
     min-width: 120px;
 }
 
 /* PR编号列 */
-.table th:nth-child(2), .table td:nth-child(2) {
+.pr-number-col {
     width: 6%;
     min-width: 60px;
     text-align: center;
 }
 
-/* PR名称列 */
-.table th:nth-child(3), .table td:nth-child(3) {
-    width: 25%;
+/* PR标题列 */
+.pr-title-col {
+    width: 22%;
     min-width: 180px;
 }
 
-/* 提交人列 */
-.table th:nth-child(4), .table td:nth-child(4) {
+/* 作者列 */
+.pr-author-col {
     width: 8%;
     min-width: 80px;
 }
 
 /* 分支列 */
-.table th:nth-child(5), .table td:nth-child(5) {
+.pr-branch-col {
     width: 8%;
     min-width: 70px;
 }
 
 /* 状态列 */
-.table th:nth-child(6), .table td:nth-child(6) {
+.pr-status-col {
     width: 7%;
     min-width: 70px;
     text-align: center;
 }
 
 /* 标签列 */
-.table th:nth-child(7), .table td:nth-child(7) {
-    width: 28%;
+.pr-labels-col {
+    width: 23%;
     min-width: 150px;
 }
 
 /* 操作列 */
-.table th:nth-child(8), .table td:nth-child(8) {
+.pr-actions-col {
     width: 6%;
     min-width: 60px;
     text-align: center;

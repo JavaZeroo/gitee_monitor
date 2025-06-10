@@ -5,13 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PR 监控</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Noto+Sans+SC:wght@300;400;            actionCell.innerHTML = `<button class="btn btn-danger btn-sm delete-pr-btn" 
-                    data-platform="${prData.platform || 'gitee'}"
-                    data-owner="${prData.owner}" 
-                    data-repo="${prData.repo}" 
-                    data-pr-id="${prData.pr_id}">`700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Noto+Sans+SC:wght@300;400;700&display=swap" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/material.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
 </head>
 
 <body>
@@ -185,6 +182,7 @@
             
             // 平台列
             const platformCell = document.createElement('td');
+            platformCell.className = 'platform-col';
             const platform = prData.platform || 'gitee';
             if (platform === 'github') {
                 platformCell.innerHTML = `
@@ -208,6 +206,7 @@
             
             // 仓库列
             const repoCell = document.createElement('td');
+            repoCell.className = 'repo-col';
             if (prData.pr_details && prData.pr_details.base && prData.pr_details.base.repo && prData.pr_details.base.repo.html_url) {
                 repoCell.innerHTML = `<a href="${prData.pr_details.base.repo.html_url}" target="_blank">${prData.owner}/${prData.repo}</a>`;
             } else {
@@ -216,6 +215,7 @@
             
             // PR编号列
             const prIdCell = document.createElement('td');
+            prIdCell.className = 'pr-number-col';
             if (prData.pr_details && prData.pr_details.html_url) {
                 prIdCell.innerHTML = `<a href="${prData.pr_details.html_url}" target="_blank">#${prData.pr_id}</a>`;
             } else {
@@ -224,6 +224,7 @@
             
             // PR名称列
             const titleCell = document.createElement('td');
+            titleCell.className = 'pr-title-col';
             if (prData.pr_details && prData.pr_details.title) {
                 if (prData.pr_details.html_url) {
                     titleCell.innerHTML = `<a href="${prData.pr_details.html_url}" target="_blank" title="${prData.pr_details.title}">${prData.pr_details.title}</a>`;
@@ -236,6 +237,7 @@
             
             // 提交人列
             const authorCell = document.createElement('td');
+            authorCell.className = 'pr-author-col';
             if (prData.pr_details && prData.pr_details.user) {
                 const userName = prData.pr_details.user.name || prData.pr_details.user.login;
                 if (prData.pr_details.user.html_url) {
@@ -249,6 +251,7 @@
             
             // 分支列
             const branchCell = document.createElement('td');
+            branchCell.className = 'pr-branch-col';
             if (prData.pr_details && prData.pr_details.base && prData.pr_details.base.ref) {
                 const branchName = prData.pr_details.base.ref;
                 if (prData.pr_details.base.repo && prData.pr_details.base.repo.html_url) {
@@ -262,6 +265,7 @@
             
             // 状态列
             const statusCell = document.createElement('td');
+            statusCell.className = 'pr-status-col';
             if (prData.pr_details && prData.pr_details.state) {
                 const state = prData.pr_details.state;
                 let badgeClass = 'bg-warning';
@@ -285,13 +289,14 @@
             
             // 标签列
             const labelsCell = document.createElement('td');
-            labelsCell.className = 'labels';
+            labelsCell.className = 'labels pr-labels-col';
             labelsCell.innerHTML = createLabelHTML(prData.current_labels);
             
             // 操作列
             const actionCell = document.createElement('td');
-            actionCell.className = 'pr-actions';
+            actionCell.className = 'pr-actions pr-actions-col';
             actionCell.innerHTML = `<button class="btn btn-danger btn-sm delete-pr-btn" 
+                    data-platform="${prData.platform || 'gitee'}"
                     data-owner="${prData.owner}" 
                     data-repo="${prData.repo}" 
                     data-pr-id="${prData.pr_id}">
@@ -353,11 +358,13 @@
                 const row = document.createElement('tr');
                 row.className = 'table-warning';
                 row.innerHTML = `
+                    <td>${errorData.platform || 'gitee'}</td>
                     <td>${errorData.owner}/${errorData.repo}</td>
                     <td>#${errorData.pr_id}</td>
-                    <td colspan="4" class="text-danger">加载失败: ${errorData.error}</td>
+                    <td colspan="5" class="text-danger">加载失败: ${errorData.error}</td>
                     <td>
                         <button class="btn btn-danger btn-sm delete-pr-btn" 
+                                data-platform="${errorData.platform || 'gitee'}"
                                 data-owner="${errorData.owner}" 
                                 data-repo="${errorData.repo}" 
                                 data-pr-id="${errorData.pr_id}">
@@ -516,7 +523,9 @@
                 const deleteBtn = e.target.closest('.delete-pr-btn');
                 if (deleteBtn) {
                     e.preventDefault();
-                    handleDeletePR(e);
+                    // 创建一个模拟事件对象，currentTarget指向删除按钮
+                    const mockEvent = { currentTarget: deleteBtn };
+                    handleDeletePR(mockEvent);
                 }
             });
 

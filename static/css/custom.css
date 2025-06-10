@@ -14,46 +14,82 @@
     border-collapse: collapse;
 }
 
-/* 精确的表格列宽度分配 */
-.table th:nth-child(1) { 
-    width: 140px; 
-    min-width: 120px; 
-} /* 仓库列 - 适中宽度 */
+/* 响应式表格容器 */
+.table-responsive {
+    overflow-x: auto;
+}
 
-.table th:nth-child(2) { 
-    width: 70px; 
-    min-width: 60px; 
-} /* PR 编号列 - 紧凑宽度 */
+/* 精确的表格列宽度分配 - 使用类名选择器匹配9列结构 */
 
-.table th:nth-child(3) { 
-    width: auto; 
-    min-width: 180px; 
-} /* PR 名称列 - 自动扩展主要空间 */
-
-.table th:nth-child(4) { 
-    width: 100px; 
-    min-width: 80px; 
-} /* 提交人列 - 适中宽度 */
-
-.table th:nth-child(5) { 
-    width: 90px; 
-    min-width: 70px; 
-} /* 分支列 - 相对紧凑 */
-
-.table th:nth-child(6) { 
+/* 第1列：平台 - 固定宽度 */
+.platform-col { 
     width: 80px; 
-    min-width: 70px; 
-} /* 状态列 - 紧凑宽度 */
+    min-width: 80px; 
+    text-align: center;
+} 
 
-.table th:nth-child(7) { 
-    width: 600px; 
-    min-width: 150px; 
-} /* 标签列 - 固定较大宽度 */
+/* 第2列：仓库 - 固定宽度 */
+.repo-col { 
+    width: 140px; 
+    min-width: 140px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+} 
 
-.table th:nth-child(8) { 
+/* 第3列：PR号 - 固定宽度 */
+.pr-number-col { 
     width: 70px; 
-    min-width: 60px; 
-} /* 操作列 - 紧凑宽度 */
+    min-width: 70px; 
+    text-align: center;
+} 
+
+/* 第4列：PR标题 - 自适应主要空间 */
+.pr-title-col { 
+    min-width: 180px;
+    max-width: 350px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+} 
+
+/* 第5列：作者 - 固定宽度 */
+.pr-author-col { 
+    width: 110px; 
+    min-width: 110px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+} 
+
+/* 第6列：分支 - 固定宽度 */
+.pr-branch-col { 
+    width: 110px; 
+    min-width: 110px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+} 
+
+/* 第7列：状态 - 固定宽度 */
+.pr-status-col { 
+    width: 90px; 
+    min-width: 90px; 
+    text-align: center;
+} 
+
+/* 第8列：标签 - 自适应宽度 */
+.pr-labels-col { 
+    min-width: 110px;
+    max-width: 180px;
+} 
+
+/* 第9列：操作 - 固定宽度 */
+.pr-actions-col { 
+    width: 80px; 
+    min-width: 80px; 
+    text-align: center;
+}
 
 /* 防止表头文字换行 */
 .table th {
@@ -85,62 +121,6 @@
     color: #0a58ca;
 }
 
-/* 仓库列样式优化 */
-.table td:nth-child(1) {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 0;
-}
-
-/* PR 编号列居中显示 */
-.table td:nth-child(2) {
-    text-align: center;
-    white-space: nowrap;
-}
-
-/* PR 名称列样式 */
-.table td:nth-child(3) {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 0;
-}
-
-/* 提交人列样式 */
-.table td:nth-child(4) {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 0;
-}
-
-/* 分支列样式 */
-.table td:nth-child(5) {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 0;
-}
-
-/* 状态列样式 */
-.table td:nth-child(6) {
-    text-align: center;
-    white-space: nowrap;
-}
-
-/* 标签列样式 */
-.table td:nth-child(7) {
-    word-break: break-word;
-    line-height: 1.4;
-}
-
-/* 操作列样式 */
-.table td:nth-child(8) {
-    text-align: center;
-    white-space: nowrap;
-}
-
 /* 响应式设计 */
 @media (max-width: 1200px) {
     .container {
@@ -153,12 +133,15 @@
     }
     
     /* 中等屏幕调整列宽 */
-    .table th:nth-child(1) { width: 120px; }
-    .table th:nth-child(3) { width: auto; min-width: 130px; }
-    .table th:nth-child(4) { width: 80px; }
-    .table th:nth-child(5) { width: 70px; }
-    .table th:nth-child(6) { width: 70px; }
-    .table th:nth-child(7) { width: 140px; }
+    .platform-col { width: 70px; min-width: 70px; }
+    .repo-col { width: 120px; min-width: 120px; }
+    .pr-number-col { width: 60px; min-width: 60px; }
+    .pr-title-col { min-width: 150px; max-width: 280px; }
+    .pr-author-col { width: 90px; min-width: 90px; }
+    .pr-branch-col { width: 90px; min-width: 90px; }
+    .pr-status-col { width: 80px; min-width: 80px; }
+    .pr-labels-col { min-width: 100px; max-width: 150px; }
+    .pr-actions-col { width: 70px; min-width: 70px; }
 }
 
 @media (max-width: 768px) {
@@ -176,14 +159,15 @@
     }
     
     /* 小屏幕紧凑布局 */
-    .table th:nth-child(1) { width: 100px; min-width: 80px; }
-    .table th:nth-child(2) { width: 50px; min-width: 40px; }
-    .table th:nth-child(3) { width: auto; min-width: 100px; }
-    .table th:nth-child(4) { width: 60px; min-width: 50px; }
-    .table th:nth-child(5) { width: 60px; min-width: 50px; }
-    .table th:nth-child(6) { width: 60px; min-width: 50px; }
-    .table th:nth-child(7) { width: 120px; min-width: 100px; }
-    .table th:nth-child(8) { width: 50px; min-width: 40px; }
+    .platform-col { width: 60px; min-width: 50px; }
+    .repo-col { width: 100px; min-width: 80px; }
+    .pr-number-col { width: 50px; min-width: 40px; }
+    .pr-title-col { min-width: 120px; max-width: 200px; }
+    .pr-author-col { width: 70px; min-width: 60px; }
+    .pr-branch-col { width: 70px; min-width: 60px; }
+    .pr-status-col { width: 60px; min-width: 50px; }
+    .pr-labels-col { min-width: 80px; max-width: 120px; }
+    .pr-actions-col { width: 50px; min-width: 40px; }
 }
 
 @media (max-width: 576px) {
@@ -196,12 +180,13 @@
     }
     
     /* 超小屏幕最紧凑布局 */
-    .table th:nth-child(1) { width: 80px; min-width: 60px; }
-    .table th:nth-child(2) { width: 40px; min-width: 30px; }
-    .table th:nth-child(3) { width: 80px; min-width: 60px; }
-    .table th:nth-child(4) { width: 40px; min-width: 30px; }
-    .table th:nth-child(5) { width: 40px; min-width: 30px; }
-    .table th:nth-child(6) { width: 40px; min-width: 30px; }
-    .table th:nth-child(7) { width: auto; min-width: 100px; }
-    .table th:nth-child(8) { width: 40px; min-width: 30px; }
+    .platform-col { width: 50px; min-width: 40px; }
+    .repo-col { width: 80px; min-width: 60px; }
+    .pr-number-col { width: 40px; min-width: 30px; }
+    .pr-title-col { min-width: 100px; max-width: 150px; }
+    .pr-author-col { width: 60px; min-width: 50px; }
+    .pr-branch-col { width: 60px; min-width: 50px; }
+    .pr-status-col { width: 50px; min-width: 40px; }
+    .pr-labels-col { min-width: 80px; max-width: 100px; }
+    .pr-actions-col { width: 40px; min-width: 30px; }
 }
