@@ -427,6 +427,74 @@ class WebApp:
             logger.info(f"通过 API 删除关注作者 {author} 的仓库 {repo} (平台: {platform})")
             return jsonify({'success': True, 'message': '关注作者删除成功'})
         
+        # 更新性能配置 API 端点
+        @self.app.route('/api/update_performance', methods=['POST'])
+        def api_update_performance():
+            try:
+                data = request.get_json()
+                
+                # 提取性能配置参数
+                max_workers = data.get('max_workers')
+                rate_limit_per_second = data.get('rate_limit_per_second')
+                cache_ttl = data.get('cache_ttl')
+                enable_parallel_processing = data.get('enable_parallel_processing')
+                poll_interval = data.get('poll_interval')
+                
+                # 验证参数
+                if max_workers is not None:
+                    if not isinstance(max_workers, int) or max_workers < 1 or max_workers > 20:
+                        return jsonify({'success': False, 'error': '最大并发线程数必须在1-20之间'}), 400
+                
+                if rate_limit_per_second is not None:
+                    if not isinstance(rate_limit_per_second, (int, float)) or rate_limit_per_second < 0.1 or rate_limit_per_second > 10.0:
+                        return jsonify({'success': False, 'error': 'API调用速率限制必须在0.1-10.0之间'}), 400
+                
+                if cache_ttl is not None:
+                    if not isinstance(cache_ttl, int) or cache_ttl < 60 or cache_ttl > 3600:
+                        return jsonify({'success': False, 'error': '缓存生存时间必须在60-3600秒之间'}), 400
+                
+                if poll_interval is not None:
+                    if not isinstance(poll_interval, int) or poll_interval < 30 or poll_interval > 600:
+                        return jsonify({'success': False, 'error': '轮询间隔必须在30-600秒之间'}), 400
+                
+                # 更新配置
+                config_updates = {}
+                if max_workers is not None:
+                    config_updates['MAX_WORKERS'] = max_workers
+                if rate_limit_per_second is not None:
+                    config_updates['RATE_LIMIT_PER_SECOND'] = rate_limit_per_second
+                if cache_ttl is not None:
+                    config_updates['CACHE_TTL'] = cache_ttl
+                if enable_parallel_processing is not None:
+                    config_updates['ENABLE_PARALLEL_PROCESSING'] = bool(enable_parallel_processing)
+                if poll_interval is not None:
+                    config_updates['POLL_INTERVAL'] = poll_interval
+                
+                # 保存配置
+                for key, value in config_updates.items():
+                    self.config.set(key, value)
+                self.config.save_config()
+                
+                logger.info(f"通过 API 更新性能配置: {config_updates}")
+                
+                # 检查是否需要重启PR监控服务以应用新配置
+                restart_needed = any(key in ['MAX_WORKERS', 'ENABLE_PARALLEL_PROCESSING', 'RATE_LIMIT_PER_SECOND'] 
+                                   for key in config_updates.keys())
+                
+                message = '性能配置更新成功'
+                if restart_needed:
+                    message += '（部分配置需要重启服务才能生效）'
+                
+                return jsonify({
+                    'success': True, 
+                    'message': message,
+                    'restart_needed': restart_needed
+                })
+                
+            except Exception as e:
+                logger.error(f"更新性能配置时出错: {e}")
+                return jsonify({'success': False, 'error': f'更新性能配置失败: {str(e)}'}), 500
+        
     def run(self, host: str = '0.0.0.0', port: int = 5000, debug: bool = False) -> None:
         """
         运行 Web 应用

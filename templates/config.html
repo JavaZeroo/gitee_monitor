@@ -172,6 +172,70 @@
                 </div>
             </div>
         </div>
+
+        <!-- 性能配置 -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h2 class="card-title">性能配置</h2>
+                <form id="performance-config-form">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="max_workers" class="form-label">最大并发线程数:</label>
+                                <input type="number" class="form-control" id="max_workers" name="max_workers"
+                                    value="{{ config.get('MAX_WORKERS', 5) }}" min="1" max="20">
+                                <div class="form-text">控制同时处理API请求的线程数量，建议1-10</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="rate_limit_per_second" class="form-label">API调用速率限制 (次/秒):</label>
+                                <input type="number" class="form-control" id="rate_limit_per_second" name="rate_limit_per_second"
+                                    value="{{ config.get('RATE_LIMIT_PER_SECOND', 1.5) }}" min="0.1" max="10.0" step="0.1">
+                                <div class="form-text">防止API调用过于频繁，建议0.5-2.0</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="cache_ttl" class="form-label">缓存生存时间 (秒):</label>
+                                <input type="number" class="form-control" id="cache_ttl" name="cache_ttl"
+                                    value="{{ config.get('CACHE_TTL', 300) }}" min="60" max="3600">
+                                <div class="form-text">数据缓存的有效时间，建议300-1800秒</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="enable_parallel_processing" name="enable_parallel_processing"
+                                        {{ 'checked' if config.get('ENABLE_PARALLEL_PROCESSING', True) else '' }}>
+                                    <label class="form-check-label" for="enable_parallel_processing">
+                                        启用并行处理
+                                    </label>
+                                    <div class="form-text">启用多线程并行处理API请求以提高性能</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="poll_interval" class="form-label">轮询间隔 (秒):</label>
+                                <input type="number" class="form-control" id="poll_interval" name="poll_interval"
+                                    value="{{ config.get('POLL_INTERVAL', 60) }}" min="30" max="600">
+                                <div class="form-text">PR标签检查的时间间隔</div>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-gear me-1" viewBox="0 0 16 16">
+                            <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
+                            <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/>
+                        </svg>
+                        保存性能配置
+                    </button>
+                </form>
+            </div>
+        </div>
     </div>
     <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
     <script>
@@ -277,6 +341,64 @@
                 } catch (error) {
                     showMessage('删除关注作者时发生错误：' + error.message, 'danger');
                 }
+            }
+        });
+
+        // 处理性能配置表单
+        document.getElementById('performance-config-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const maxWorkers = parseInt(document.getElementById('max_workers').value);
+            const rateLimitPerSecond = parseFloat(document.getElementById('rate_limit_per_second').value);
+            const cacheTtl = parseInt(document.getElementById('cache_ttl').value);
+            const enableParallelProcessing = document.getElementById('enable_parallel_processing').checked;
+            const pollInterval = parseInt(document.getElementById('poll_interval').value);
+            
+            // 基本验证
+            if (maxWorkers < 1 || maxWorkers > 20) {
+                showMessage('最大并发线程数必须在1-20之间！', 'danger');
+                return;
+            }
+            
+            if (rateLimitPerSecond < 0.1 || rateLimitPerSecond > 10.0) {
+                showMessage('API调用速率限制必须在0.1-10.0之间！', 'danger');
+                return;
+            }
+            
+            if (cacheTtl < 60 || cacheTtl > 3600) {
+                showMessage('缓存生存时间必须在60-3600秒之间！', 'danger');
+                return;
+            }
+            
+            if (pollInterval < 30 || pollInterval > 600) {
+                showMessage('轮询间隔必须在30-600秒之间！', 'danger');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/update_performance', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        max_workers: maxWorkers,
+                        rate_limit_per_second: rateLimitPerSecond,
+                        cache_ttl: cacheTtl,
+                        enable_parallel_processing: enableParallelProcessing,
+                        poll_interval: pollInterval
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(result.message, 'success');
+                } else {
+                    showMessage(result.error, 'danger');
+                }
+            } catch (error) {
+                showMessage('更新性能配置时发生错误：' + error.message, 'danger');
             }
         });
     </script>

@@ -20,6 +20,9 @@ class Config:
         "CACHE_TTL": 300,  # 缓存生存时间（秒）
         "POLL_INTERVAL": 60,  # 轮询间隔（秒）
         "ENABLE_NOTIFICATIONS": False,  # 是否启用通知
+        "MAX_WORKERS": 5,  # 最大并发线程数
+        "RATE_LIMIT_PER_SECOND": 1.5,  # API调用速率限制（每秒调用次数）
+        "ENABLE_PARALLEL_PROCESSING": True,  # 是否启用并行处理
     }
     
     def __init__(self, config_file: str):
