@@ -238,59 +238,71 @@ class Config:
         pr_lists = self.config.get("PULL_REQUEST_LISTS", [])
         return [pr.get("PULL_REQUEST_ID") for pr in pr_lists if pr.get("PULL_REQUEST_ID")]
         
-    def add_followed_author(self, author: str, repo: str) -> None:
+    def add_followed_author(self, author: str, repo: str, platform: str = "gitee") -> None:
         """
         添加关注的PR创建者
         
         Args:
             author: PR创建者用户名
             repo: 仓库名称，格式为 owner/repo
+            platform: 平台名称，gitee 或 github
         """
         followed_authors = self.config.get("FOLLOWED_AUTHORS", [])
         
         # 检查是否已存在相同的关注
         for existing_author in followed_authors:
             if (existing_author.get("AUTHOR") == author and 
-                existing_author.get("REPO") == repo):
-                logger.warning(f"作者 {author} 的仓库 {repo} 已存在于关注列表中")
+                existing_author.get("REPO") == repo and
+                existing_author.get("PLATFORM") == platform):
+                logger.warning(f"作者 {author} 的仓库 {repo} 在平台 {platform} 已存在于关注列表中")
                 return
         
         # 添加新关注
         followed_authors.append({
             "AUTHOR": author,
-            "REPO": repo
+            "REPO": repo,
+            "PLATFORM": platform
         })
         self.config["FOLLOWED_AUTHORS"] = followed_authors
-        logger.info(f"添加作者 {author} 的仓库 {repo} 到关注列表")
+        logger.info(f"添加作者 {author} 的仓库 {repo} 到关注列表 (平台: {platform})")
     
-    def remove_followed_author(self, author: str, repo: str) -> None:
+    def remove_followed_author(self, author: str, repo: str, platform: str = "gitee") -> None:
         """
         从关注列表中移除PR创建者
         
         Args:
             author: PR创建者用户名
             repo: 仓库名称，格式为 owner/repo
+            platform: 平台名称，gitee 或 github
         """
         followed_authors = self.config.get("FOLLOWED_AUTHORS", [])
         
         for i, existing_author in enumerate(followed_authors):
             if (existing_author.get("AUTHOR") == author and 
-                existing_author.get("REPO") == repo):
+                existing_author.get("REPO") == repo and
+                existing_author.get("PLATFORM") == platform):
                 followed_authors.pop(i)
                 self.config["FOLLOWED_AUTHORS"] = followed_authors
-                logger.info(f"从关注列表中移除作者 {author} 的仓库 {repo}")
+                logger.info(f"从关注列表中移除作者 {author} 的仓库 {repo} (平台: {platform})")
                 return
         
-        logger.warning(f"未找到要移除的作者 {author} 的仓库 {repo}")
+        logger.warning(f"未找到要移除的作者 {author} 的仓库 {repo} (平台: {platform})")
     
     def get_followed_authors(self) -> List[Dict[str, Any]]:
         """
         获取所有关注的PR创建者列表
         
         Returns:
-            关注列表，每个元素包含 AUTHOR、REPO
+            关注列表，每个元素包含 AUTHOR、REPO、PLATFORM
         """
-        return self.config.get("FOLLOWED_AUTHORS", [])
+        followed_authors = self.config.get("FOLLOWED_AUTHORS", [])
+        
+        # 向后兼容：为没有PLATFORM字段的旧配置项添加默认值
+        for author_config in followed_authors:
+            if "PLATFORM" not in author_config:
+                author_config["PLATFORM"] = "gitee"  # 默认为gitee平台
+        
+        return followed_authors
     
     def get_automation_rules(self) -> List[Dict[str, Any]]:
         """
