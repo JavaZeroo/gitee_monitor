@@ -23,6 +23,14 @@ class Config:
         "MAX_WORKERS": 5,  # 最大并发线程数
         "RATE_LIMIT_PER_SECOND": 1.5,  # API调用速率限制（每秒调用次数）
         "ENABLE_PARALLEL_PROCESSING": True,  # 是否启用并行处理
+        "AUTOMATION_RULES": [],  # 自动化规则列表
+        "AUTOMATION_CONFIG": {  # 自动化引擎配置
+            "enabled": True,
+            "max_parallel_executions": 5,
+            "default_cooldown": 300,
+            "max_executions_per_day": 100,
+            "log_level": "INFO"
+        }
     }
     
     def __init__(self, config_file: str):
@@ -40,7 +48,7 @@ class Config:
         """从文件加载配置"""
         if os.path.exists(self.config_file):
             try:
-                with open(self.config_file, 'r') as f:
+                with open(self.config_file, 'r', encoding='utf-8') as f:
                     loaded_config = json.load(f)
                     
                     # 处理旧配置格式的兼容性
@@ -72,18 +80,52 @@ class Config:
                             if key in loaded_config:
                                 self.config[key] = loaded_config[key]
                                 
+                        # 如果存在旧的独立规则文件，尝试合并
+                        self._migrate_old_rules_if_needed()
+                                
                 logger.info(f"配置已从 {self.config_file} 加载")
             except (json.JSONDecodeError, IOError) as e:
                 logger.error(f"加载配置文件失败: {e}")
         else:
             logger.warning(f"配置文件 {self.config_file} 不存在，使用默认配置")
+            # 检查是否存在旧的独立规则文件
+            self._migrate_old_rules_if_needed()
             self.save_config()  # 创建默认配置文件
+    
+    def _migrate_old_rules_if_needed(self) -> None:
+        """如果存在旧的独立规则文件，则迁移到主配置中"""
+        old_rules_file = os.path.join(os.path.dirname(self.config_file), "automation", "rules.json")
+        
+        if os.path.exists(old_rules_file):
+            try:
+                with open(old_rules_file, 'r', encoding='utf-8') as f:
+                    rules_data = json.load(f)
+                
+                if rules_data and not self.config.get("AUTOMATION_RULES"):
+                    self.config["AUTOMATION_RULES"] = rules_data
+                    logger.info(f"已从 {old_rules_file} 迁移 {len(rules_data)} 个自动化规则")
+                    
+                    # 创建备份并删除旧文件
+                    backup_file = old_rules_file + ".migrated.bak"
+                    os.rename(old_rules_file, backup_file)
+                    logger.info(f"旧规则文件已备份到: {backup_file}")
+                    
+                    # 尝试删除空目录
+                    automation_dir = os.path.dirname(old_rules_file)
+                    try:
+                        os.rmdir(automation_dir)
+                        logger.info(f"已删除空目录: {automation_dir}")
+                    except OSError:
+                        pass  # 目录不为空或其他原因，忽略
+                        
+            except Exception as e:
+                logger.warning(f"迁移旧规则文件失败: {e}")
     
     def save_config(self) -> None:
         """保存配置到文件"""
         try:
-            with open(self.config_file, 'w') as f:
-                json.dump(self.config, f, indent=4)
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(self.config, f, indent=4, ensure_ascii=False)
             logger.info(f"配置已保存到 {self.config_file}")
         except IOError as e:
             logger.error(f"保存配置文件失败: {e}")
@@ -249,3 +291,47 @@ class Config:
             关注列表，每个元素包含 AUTHOR、REPO
         """
         return self.config.get("FOLLOWED_AUTHORS", [])
+    
+    def get_automation_rules(self) -> List[Dict[str, Any]]:
+        """
+        获取所有自动化规则
+        
+        Returns:
+            自动化规则列表
+        """
+        return self.config.get("AUTOMATION_RULES", [])
+    
+    def set_automation_rules(self, rules: List[Dict[str, Any]]) -> None:
+        """
+        设置自动化规则列表
+        
+        Args:
+            rules: 自动化规则列表
+        """
+        self.config["AUTOMATION_RULES"] = rules
+    
+    def get_automation_config(self) -> Dict[str, Any]:
+        """
+        获取自动化引擎配置
+        
+        Returns:
+            自动化引擎配置
+        """
+        return self.config.get("AUTOMATION_CONFIG", {
+            "enabled": True,
+            "max_parallel_executions": 5,
+            "default_cooldown": 300,
+            "max_executions_per_day": 100,
+            "log_level": "INFO"
+        })
+    
+    def update_automation_config(self, automation_config: Dict[str, Any]) -> None:
+        """
+        更新自动化引擎配置
+        
+        Args:
+            automation_config: 自动化引擎配置
+        """
+        current_config = self.get_automation_config()
+        current_config.update(automation_config)
+        self.config["AUTOMATION_CONFIG"] = current_config

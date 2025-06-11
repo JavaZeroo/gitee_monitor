@@ -190,13 +190,9 @@ class PRMonitor:
         self.poll_thread = None
         
         # 初始化自动化引擎
-        automation_config = AutomationConfig(
-            enabled=self.config.get("AUTOMATION_ENABLED", True),
-            max_parallel_executions=self.config.get("AUTOMATION_MAX_PARALLEL", 3),
-            default_cooldown=self.config.get("AUTOMATION_DEFAULT_COOLDOWN", 300),
-            storage_path=self.config.get("AUTOMATION_STORAGE_PATH", "automation")
-        )
-        self.automation_engine = AutomationEngine(self.api_clients, automation_config)
+        automation_config_dict = self.config.get_automation_config()
+        automation_config = AutomationConfig.from_dict(automation_config_dict)
+        self.automation_engine = AutomationEngine(self.api_clients, self.config, automation_config)
         logger.info("自动化引擎已初始化")
         
     def _get_api_client(self, platform: str) -> Optional[BaseAPIClient]:

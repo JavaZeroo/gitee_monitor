@@ -1,24 +1,21 @@
 """
 自动化引擎模块，处理自动化规则的执行和管理
 """
-import os
 import re
 import time
 import asyncio
 import logging
 import threading
-from typing import Dict, List, Any, Optional, Set
+from typing import Dict, List, Any, Optional
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 import requests
 import json
 
 from ..models.automation import (
     AutomationRule, Condition, Action, ExecutionRecord, AutomationConfig,
-    TriggerType, ConditionType, ActionType, OperatorType, TimeRange
+    TriggerType, ConditionType, ActionType, OperatorType
 )
-from ..models import PullRequest
 from ..api.base_api import BaseAPIClient
 
 logger = logging.getLogger(__name__)
@@ -405,26 +402,28 @@ class ActionExecutor:
 class AutomationEngine:
     """自动化引擎"""
     
-    def __init__(self, api_clients: Dict[str, BaseAPIClient], config: AutomationConfig = None):
+    def __init__(self, api_clients: Dict[str, BaseAPIClient], config_manager, automation_config: AutomationConfig = None):
         """
         初始化自动化引擎
         
         Args:
             api_clients: API客户端字典
-            config: 自动化配置
+            config_manager: 配置管理器实例
+            automation_config: 自动化配置
         """
         self.api_clients = api_clients
-        self.config = config or AutomationConfig()
+        self.config_manager = config_manager
+        
+        # 从配置管理器获取自动化配置
+        automation_config_dict = config_manager.get_automation_config()
+        self.config = automation_config or AutomationConfig.from_dict(automation_config_dict)
+        
         self.rules: List[AutomationRule] = []
         self.execution_history: List[ExecutionRecord] = []
         self.condition_evaluator = ConditionEvaluator()
         self.action_executor = ActionExecutor(api_clients)
         self.thread_pool = ThreadPoolExecutor(max_workers=self.config.max_parallel_executions)
         self._lock = threading.Lock()
-        
-        # 创建存储目录
-        self.storage_path = Path(self.config.storage_path)
-        self.storage_path.mkdir(exist_ok=True)
         
         # 加载规则
         self.load_rules()
@@ -528,12 +527,11 @@ class AutomationEngine:
         sorted_rules = sorted(
             [rule for rule in self.rules if rule.enabled],
             key=lambda r: r.priority,
-            reverse=True
-        )
+            reverse=True        )
         
         for rule in sorted_rules:
             if self._should_execute_rule(rule, event_type, pr_data, context):
-                future = self.thread_pool.submit(self._execute_rule_sync, rule, pr_data, context)
+                self.thread_pool.submit(self._execute_rule_sync, rule, pr_data, context)
                 executed_rules.append(rule.id)
         
         return executed_rules
@@ -595,8 +593,7 @@ class AutomationEngine:
             success = False
             error_message = str(e)
             logger.error(f"执行规则 {rule.id} 失败: {e}")
-        
-        # 更新规则统计
+          # 更新规则统计
         with self._lock:
             rule.update_statistics(success)
         
@@ -664,32 +661,27 @@ class AutomationEngine:
         }
     
     def save_rules(self):
-        """保存规则到文件"""
+        """保存规则到配置文件"""
         try:
-            rules_file = self.storage_path / 'rules.json'
             rules_data = [rule.to_dict() for rule in self.rules]
-            
-            with open(rules_file, 'w', encoding='utf-8') as f:
-                json.dump(rules_data, f, ensure_ascii=False, indent=2)
-            
-            logger.debug(f"规则已保存到 {rules_file}")
+            self.config_manager.set_automation_rules(rules_data)
+            self.config_manager.save_config()
+            logger.debug("规则已保存到配置文件")
         except Exception as e:
             logger.error(f"保存规则失败: {e}")
     
     def load_rules(self):
-        """从文件加载规则"""
+        """从配置文件加载规则"""
         try:
-            rules_file = self.storage_path / 'rules.json'
-            if not rules_file.exists():
-                logger.info("规则文件不存在，创建默认规则")
+            rules_data = self.config_manager.get_automation_rules()
+            
+            if not rules_data:
+                logger.info("配置文件中没有规则，创建默认规则")
                 self._create_default_rules()
                 return
             
-            with open(rules_file, 'r', encoding='utf-8') as f:
-                rules_data = json.load(f)
-            
             self.rules = [AutomationRule.from_dict(rule_data) for rule_data in rules_data]
-            logger.info(f"加载了 {len(self.rules)} 个自动化规则")
+            logger.info(f"从配置文件加载了 {len(self.rules)} 个自动化规则")
             
         except Exception as e:
             logger.error(f"加载规则失败: {e}")
