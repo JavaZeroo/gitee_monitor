@@ -258,6 +258,9 @@ class PRMonitor:
         # 检查缓存
         cached_data = self.cache.get(cache_key)
         if cached_data:
+            # 确保缓存数据包含平台信息
+            if 'platform' not in cached_data:
+                cached_data['platform'] = platform
             return PullRequest.from_dict(cached_data)
             
         # 获取对应平台的API客户端
@@ -268,6 +271,8 @@ class PRMonitor:
             
         pr_data = api_client.get_pr_details(owner, repo, pr_id)
         if pr_data:
+            # 确保PR数据包含平台信息
+            pr_data['platform'] = platform
             self.cache.set(cache_key, pr_data)
             return PullRequest.from_dict(pr_data)
         return None
@@ -408,6 +413,8 @@ class PRMonitor:
                 if cached_data:
                     # 直接使用缓存数据
                     for pr_data in cached_data:
+                        # 确保PR数据包含平台信息
+                        pr_data['platform'] = platform
                         pr = PullRequest.from_dict(pr_data)
                         cached_prs.append(pr)
                         self._add_pr_to_monitor_if_needed(pr, owner, repo, platform, auto_add_to_monitor)
@@ -492,6 +499,8 @@ class PRMonitor:
             
             # 将PR数据转换为PullRequest对象
             for pr_data in prs_data:
+                # 确保PR数据包含平台信息
+                pr_data['platform'] = platform
                 pr = PullRequest.from_dict(pr_data)
                 all_prs.append(pr)
                 self._add_pr_to_monitor_if_needed(pr, owner, repo, platform, auto_add_to_monitor)

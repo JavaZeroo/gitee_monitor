@@ -113,6 +113,7 @@ class PullRequest:
     # 新增字段用于缓存处理
     owner: str = field(init=False)
     repo: str = field(init=False)
+    platform: str = field(default="gitee")  # 添加平台信息
     
     def __post_init__(self):
         """初始化后处理"""
@@ -141,8 +142,7 @@ class PullRequest:
         head_data = data.get('head', {})
         base = PRBranch.from_dict(base_data) if base_data else None
         head = PRBranch.from_dict(head_data) if head_data else None
-        
-        # 处理标签信息
+          # 处理标签信息
         labels_data = data.get('labels', [])
         labels = [PRLabel.from_dict(label) for label in labels_data]
         
@@ -160,7 +160,8 @@ class PullRequest:
             updated_at=data.get('updated_at'),
             closed_at=data.get('closed_at'),
             merged_at=data.get('merged_at'),
-            labels=labels
+            labels=labels,
+            platform=data.get('platform', 'gitee')  # 添加平台信息处理
         )
     
     def to_dict(self) -> Dict[str, Any]:
@@ -213,12 +214,12 @@ class PullRequest:
                         'html_url': self.head.repo.owner.html_url
                     }
                 }
-            } if self.head else None,
-            'html_url': self.html_url,
+            } if self.head else None,            'html_url': self.html_url,
             'created_at': self.created_at,
             'updated_at': self.updated_at,
             'closed_at': self.closed_at,
             'merged_at': self.merged_at,
+            'platform': self.platform,  # 添加平台信息
             'labels': [
                 {
                     'id': label.id,
