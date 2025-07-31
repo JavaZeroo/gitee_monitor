@@ -9,7 +9,6 @@ from flask import Flask, request, render_template, redirect, url_for, jsonify, R
 
 from ..config.config_manager import Config
 from ..services.pr_monitor import PRMonitor
-from ..services.async_pr_monitor import AsyncPRMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +25,7 @@ class WebApp:
         """
         self.config = config
         self.pr_monitor = pr_monitor
-        # 初始化高性能PR监控器
-        self.async_pr_monitor = AsyncPRMonitor(config)
-        self.app = Flask(__name__, 
+        self.app = Flask(__name__,
                          template_folder='../../templates',
                          static_folder='../../static')
         self._register_routes()
@@ -228,7 +225,7 @@ class WebApp:
                 start_time = time.time()
                 logger.info(f"开始获取 {len(pr_list)} 个PR的信息...")
                 
-                results = await self.async_pr_monitor.get_multiple_pr_info_async(pr_list)
+                results = await self.pr_monitor.get_multiple_pr_info_async(pr_list)
                 
                 pr_data = {}
                 for i, pr_info in enumerate(results):
@@ -333,7 +330,7 @@ class WebApp:
                         # 注意：这里不能直接yield，需要另想办法
                         return progress_data
                     
-                    results = await self.async_pr_monitor.get_multiple_pr_info_async(pr_list)
+                    results = await self.pr_monitor.get_multiple_pr_info_async(pr_list)
                     
                     end_time = time.time()
                     elapsed = end_time - start_time

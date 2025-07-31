@@ -5,6 +5,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 import logging
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
@@ -104,3 +105,28 @@ class BaseAPIClient(ABC):
             配置是否有效
         """
         return bool(self.api_url and self.access_token)
+
+    async def __aenter__(self):
+        self._session = aiohttp.ClientSession(headers=self.headers, timeout=aiohttp.ClientTimeout(total=30))
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if getattr(self, "_session", None):
+            await self._session.close()
+            self._session = None
+
+    async def _make_request(self, method: str, url: str, **kwargs) -> Optional[Dict[str, Any]]:
+        session = getattr(self, "_session", None)
+        if session is None:
+            async with aiohttp.ClientSession(headers=self.headers, timeout=aiohttp.ClientTimeout(total=30)) as temp_session:
+                return await self._request_with_session(temp_session, method, url, **kwargs)
+        return await self._request_with_session(session, method, url, **kwargs)
+
+    async def _request_with_session(self, session: aiohttp.ClientSession, method: str, url: str, **kwargs) -> Optional[Dict[str, Any]]:
+        try:
+            async with session.request(method, url, **kwargs) as resp:
+                resp.raise_for_status()
+                return await resp.json()
+        except aiohttp.ClientError as e:
+            logger.error(f"Request failed: {method} {url} - {e}")
+            return None
