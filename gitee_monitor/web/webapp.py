@@ -63,12 +63,16 @@ class WebApp:
             if request.method == 'POST':
                 action = request.form.get('action')
                 if action == 'update_api':
-                    if not request.form.get('access_token'):
-                        error = 'ACCESS_TOKEN 是必填的！'
+                    gitee_token = request.form.get('gitee_access_token', '').strip()
+                    github_token = request.form.get('github_access_token', '').strip()
+
+                    if not gitee_token and not github_token:
+                        error = '至少需要配置一个平台的访问令牌！'
                     else:
-                        self.config.update({
-                            "ACCESS_TOKEN": request.form.get('access_token')
-                        })
+                        if gitee_token:
+                            self.config.set_platform_config('gitee', access_token=gitee_token)
+                        if github_token:
+                            self.config.set_platform_config('github', access_token=github_token)
                         self.config.save_config()
                         logger.info("API 配置更新完成")
                 elif action == 'add_pr':
@@ -485,18 +489,14 @@ class WebApp:
             data = request.get_json()
             gitee_access_token = data.get('gitee_access_token', '').strip()
             github_access_token = data.get('github_access_token', '').strip()
-            
+
             if not gitee_access_token and not github_access_token:
                 return jsonify({'success': False, 'error': '至少需要配置一个平台的访问令牌！'}), 400
-            
-            # 更新配置
-            config_updates = {}
+
             if gitee_access_token:
-                config_updates["ACCESS_TOKEN"] = gitee_access_token
+                self.config.set_platform_config('gitee', access_token=gitee_access_token)
             if github_access_token:
-                config_updates["GITHUB_ACCESS_TOKEN"] = github_access_token
-                
-            self.config.update(config_updates)
+                self.config.set_platform_config('github', access_token=github_access_token)
             self.config.save_config()
             logger.info("通过 API 更新多平台 API 配置")
             
@@ -563,7 +563,7 @@ class WebApp:
         @self.app.route('/api/delete_followed_author', methods=['DELETE'])
         def api_delete_followed_author():
             data = request.get_json()
-            platform = data.get('platform', 'gitee')  # 默认为gitee以保持向后兼容
+            platform = data.get('platform', 'gitee')  # 默认为 gitee
             author = data.get('author')
             repo = data.get('repo')
             

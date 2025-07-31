@@ -69,8 +69,10 @@ python main.py
 
 配置文件 `config.json` 包含以下字段：
 
-- `GITEA_URL`: Gitee API URL
-- `ACCESS_TOKEN`: Gitee 访问令牌
+- `PLATFORM`: 平台配置列表，每个元素包含：
+  - `NAME`: 平台名称，如 `gitee`、`github`
+  - `API_URL`: 对应平台的 API 地址
+  - `ACCESS_TOKEN`: 访问该平台的令牌
 - `PULL_REQUEST_LISTS`: 监控的 PR 列表，每个元素包含：
   - `OWNER`: 仓库拥有者
   - `REPO`: 仓库名称
@@ -83,8 +85,18 @@ python main.py
 
 ```json
 {
-    "GITEA_URL": "https://gitee.com/api/v5",
-    "ACCESS_TOKEN": "your_access_token_here",
+    "PLATFORM": [
+        {
+            "NAME": "gitee",
+            "API_URL": "https://gitee.com/api/v5",
+            "ACCESS_TOKEN": "your_access_token_here"
+        },
+        {
+            "NAME": "github",
+            "API_URL": "https://api.github.com",
+            "ACCESS_TOKEN": ""
+        }
+    ],
     "PULL_REQUEST_LISTS": [
         {
             "OWNER": "mindspore",

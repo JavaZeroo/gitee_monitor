@@ -4,6 +4,7 @@
 import os
 import json
 import logging
+import copy
 from typing import Dict, Any, List
 
 logger = logging.getLogger(__name__)
@@ -12,9 +13,18 @@ class Config:
     """配置管理类，处理配置的加载、存储和访问"""
     
     DEFAULT_CONFIG = {
-        "GITEA_URL": "https://gitee.com/api/v5",
-        "ACCESS_TOKEN": "",
-        "GITHUB_ACCESS_TOKEN": "",
+        "PLATFORM": [
+            {
+                "NAME": "gitee",
+                "API_URL": "https://gitee.com/api/v5",
+                "ACCESS_TOKEN": ""
+            },
+            {
+                "NAME": "github",
+                "API_URL": "https://api.github.com",
+                "ACCESS_TOKEN": ""
+            }
+        ],
         "PULL_REQUEST_LISTS": [],  # PR监控列表，每个元素包含OWNER、REPO、PULL_REQUEST_ID
         "FOLLOWED_AUTHORS": [],  # 关注的PR创建者列表，每个元素包含AUTHOR、REPO
         "CACHE_TTL": 300,  # 缓存生存时间（秒）
@@ -41,7 +51,7 @@ class Config:
             config_file: 配置文件路径
         """
         self.config_file = config_file
-        self.config = self.DEFAULT_CONFIG.copy()
+        self.config = copy.deepcopy(self.DEFAULT_CONFIG)
         self.load_config()
         
     def load_config(self) -> None:
@@ -50,77 +60,17 @@ class Config:
             try:
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     loaded_config = json.load(f)
-                    
-                    # 处理旧配置格式的兼容性
-                    if "OWNER" in loaded_config and "REPO" in loaded_config and "PULL_REQUEST_IDS" in loaded_config:
-                        # 转换旧格式到新格式
-                        owner = loaded_config.get("OWNER", "")
-                        repo = loaded_config.get("REPO", "")
-                        pr_ids = loaded_config.get("PULL_REQUEST_IDS", [])
-                        
-                        if owner and repo and pr_ids:
-                            self.config["PULL_REQUEST_LISTS"] = []
-                            for pr_id in pr_ids:
-                                self.config["PULL_REQUEST_LISTS"].append({
-                                    "OWNER": owner,
-                                    "REPO": repo,
-                                    "PULL_REQUEST_ID": pr_id
-                                })
-                        
-                        # 复制其他配置项
-                        for key in ["GITEA_URL", "ACCESS_TOKEN", "CACHE_TTL", "POLL_INTERVAL", "ENABLE_NOTIFICATIONS"]:
-                            if key in loaded_config:
-                                self.config[key] = loaded_config[key]
-                                
-                        logger.info("检测到旧配置格式，已自动转换为新格式")
-                        self.save_config()  # 保存转换后的配置
-                    else:
-                        # 新格式配置，直接更新
-                        for key in self.config:
-                            if key in loaded_config:
-                                self.config[key] = loaded_config[key]
-                                
-                        # 如果存在旧的独立规则文件，尝试合并
-                        self._migrate_old_rules_if_needed()
+
+                    for key in self.config:
+                        if key in loaded_config:
+                            self.config[key] = loaded_config[key]
                                 
                 logger.info(f"配置已从 {self.config_file} 加载")
             except (json.JSONDecodeError, IOError) as e:
                 logger.error(f"加载配置文件失败: {e}")
         else:
             logger.warning(f"配置文件 {self.config_file} 不存在，使用默认配置")
-            # 检查是否存在旧的独立规则文件
-            self._migrate_old_rules_if_needed()
             self.save_config()  # 创建默认配置文件
-    
-    def _migrate_old_rules_if_needed(self) -> None:
-        """如果存在旧的独立规则文件，则迁移到主配置中"""
-        old_rules_file = os.path.join(os.path.dirname(self.config_file), "automation", "rules.json")
-        
-        if os.path.exists(old_rules_file):
-            try:
-                with open(old_rules_file, 'r', encoding='utf-8') as f:
-                    rules_data = json.load(f)
-                
-                if rules_data and not self.config.get("AUTOMATION_RULES"):
-                    self.config["AUTOMATION_RULES"] = rules_data
-                    logger.info(f"已从 {old_rules_file} 迁移 {len(rules_data)} 个自动化规则")
-                    
-                    # 创建备份并删除旧文件
-                    backup_file = old_rules_file + ".migrated.bak"
-                    os.rename(old_rules_file, backup_file)
-                    logger.info(f"旧规则文件已备份到: {backup_file}")
-                    
-                    # 尝试删除空目录
-                    automation_dir = os.path.dirname(old_rules_file)
-                    try:
-                        os.rmdir(automation_dir)
-                        logger.info(f"已删除空目录: {automation_dir}")
-                    except OSError:
-                        pass  # 目录不为空或其他原因，忽略
-                        
-            except Exception as e:
-                logger.warning(f"迁移旧规则文件失败: {e}")
-    
     def save_config(self) -> None:
         """保存配置到文件"""
         try:
@@ -163,6 +113,40 @@ class Config:
         for key, value in config_dict.items():
             if key in self.config:
                 self.config[key] = value
+
+    def get_platforms(self) -> List[Dict[str, Any]]:
+        """获取所有平台配置列表"""
+        return self.config.get("PLATFORM", [])
+
+    def get_platform_config(self, name: str) -> Dict[str, Any]:
+        """根据名称获取单个平台配置"""
+        for p in self.get_platforms():
+            if p.get("NAME") == name:
+                return p
+        return {}
+
+    def set_platform_config(self, name: str, api_url: str = None, access_token: str = None) -> None:
+        """设置或更新单个平台配置"""
+        platforms = self.get_platforms()
+        for p in platforms:
+            if p.get("NAME") == name:
+                if api_url is not None:
+                    p["API_URL"] = api_url
+                if access_token is not None:
+                    p["ACCESS_TOKEN"] = access_token
+                self.config["PLATFORM"] = platforms
+                return
+        new_entry = {"NAME": name, "API_URL": api_url or "", "ACCESS_TOKEN": access_token or ""}
+        platforms.append(new_entry)
+        self.config["PLATFORM"] = platforms
+
+    def get_access_token(self, name: str) -> str:
+        """获取指定平台的访问令牌"""
+        return self.get_platform_config(name).get("ACCESS_TOKEN", "")
+
+    def get_api_url(self, name: str) -> str:
+        """获取指定平台的API URL"""
+        return self.get_platform_config(name).get("API_URL", "")
     
     def add_pr(self, owner: str, repo: str, pr_id: int, platform: str = "gitee") -> None:
         """
@@ -228,15 +212,6 @@ class Config:
         """
         return self.config.get("PULL_REQUEST_LISTS", [])
     
-    def get_pr_ids(self) -> List[int]:
-        """
-        获取所有监控的 PR ID（兼容性方法，已废弃）
-        
-        Returns:
-            PR ID 列表
-        """
-        pr_lists = self.config.get("PULL_REQUEST_LISTS", [])
-        return [pr.get("PULL_REQUEST_ID") for pr in pr_lists if pr.get("PULL_REQUEST_ID")]
         
     def add_followed_author(self, author: str, repo: str, platform: str = "gitee") -> None:
         """
@@ -295,14 +270,7 @@ class Config:
         Returns:
             关注列表，每个元素包含 AUTHOR、REPO、PLATFORM
         """
-        followed_authors = self.config.get("FOLLOWED_AUTHORS", [])
-        
-        # 向后兼容：为没有PLATFORM字段的旧配置项添加默认值
-        for author_config in followed_authors:
-            if "PLATFORM" not in author_config:
-                author_config["PLATFORM"] = "gitee"  # 默认为gitee平台
-        
-        return followed_authors
+        return self.config.get("FOLLOWED_AUTHORS", [])
     
     def get_automation_rules(self) -> List[Dict[str, Any]]:
         """
