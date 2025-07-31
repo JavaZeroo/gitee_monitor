@@ -1,6 +1,5 @@
-"""
-需求文件，列出所有依赖项
-"""
-flask==2.0.1
-requests==2.26.0
-python-dotenv==0.19.0
+flask
+werkzeug
+requests
+python-dotenv
+aiohttp

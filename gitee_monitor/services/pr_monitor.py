@@ -317,6 +317,7 @@ class PRMonitor:
     def get_all_pr_labels(self, force_refresh: bool = False) -> Dict[str, List[str]]:
         """
         获取所有监控的 PR 的标签（支持并行处理）
+        优化后直接从PR详情中提取标签信息，避免额外的API调用
         
         Args:
             force_refresh: 是否强制刷新缓存
@@ -346,31 +347,37 @@ class PRMonitor:
         
         # 根据配置选择并行或串行处理
         if self.enable_parallel and self.thread_pool:
-            # 并行获取PR标签
+            # 并行获取PR详情
             future_to_key = {}
             for platform, owner, repo, pr_id in tasks:
                 cache_key = f"{platform}:{owner}/{repo}#{pr_id}"
-                future = self.thread_pool.submit(self.get_pr_labels, platform, owner, repo, pr_id, force_refresh)
+                future = self.thread_pool.submit(self.get_pr_details, platform, owner, repo, pr_id, force_refresh)
                 future_to_key[future] = cache_key
             
             # 收集结果
             for future in as_completed(future_to_key):
                 cache_key = future_to_key[future]
                 try:
-                    labels = future.result()
-                    result[cache_key] = [label.get("name", "") for label in labels]
+                    pr_details = future.result()
+                    if pr_details:
+                        result[cache_key] = [label.name for label in pr_details.labels]
+                    else:
+                        result[cache_key] = []
                 except Exception as e:
-                    logger.error(f"获取 {cache_key} 标签时出错: {e}")
+                    logger.error(f"获取 {cache_key} 详情时出错: {e}")
                     result[cache_key] = []
         else:
             # 串行处理
             for platform, owner, repo, pr_id in tasks:
                 cache_key = f"{platform}:{owner}/{repo}#{pr_id}"
                 try:
-                    labels = self.get_pr_labels(platform, owner, repo, pr_id, force_refresh)
-                    result[cache_key] = [label.get("name", "") for label in labels]
+                    pr_details = self.get_pr_details(platform, owner, repo, pr_id, force_refresh)
+                    if pr_details:
+                        result[cache_key] = [label.name for label in pr_details.labels]
+                    else:
+                        result[cache_key] = []
                 except Exception as e:
-                    logger.error(f"获取 {cache_key} 标签时出错: {e}")
+                    logger.error(f"获取 {cache_key} 详情时出错: {e}")
                     result[cache_key] = []
                 
         return result
@@ -598,8 +605,13 @@ class PRMonitor:
             repo: 仓库名称
             pr_id: PR ID
         """
-        labels = self.get_pr_labels(platform, owner, repo, pr_id, force_refresh=True)
-        label_names = {label.get("name", "") for label in labels}
+        # 获取PR详情，其中包含标签信息
+        pr_details = self.get_pr_details(platform, owner, repo, pr_id, force_refresh=True)
+        if not pr_details:
+            return
+            
+        # 从PR详情中提取标签名称
+        label_names = {label.name for label in pr_details.labels}
         
         cache_key = f"{platform}:{owner}/{repo}#{pr_id}"
         
@@ -823,6 +835,7 @@ class PRMonitor:
     def get_multiple_pr_labels_batch(self, pr_list: List[Dict[str, Any]], force_refresh: bool = False) -> Dict[str, List[Dict[str, Any]]]:
         """
         并行获取多个PR的标签信息
+        优化后直接从PR详情中提取标签信息，避免额外的API调用
         
         Args:
             pr_list: PR信息列表，每个元素包含 platform, owner, repo, pr_id
@@ -836,7 +849,7 @@ class PRMonitor:
         
         # 根据配置选择并行或串行处理
         if self.enable_parallel and self.thread_pool:
-            # 并行获取PR标签
+            # 并行获取PR详情
             future_to_key = {}
             for pr_info in pr_list:
                 platform = pr_info.get("platform", "gitee")
@@ -846,7 +859,7 @@ class PRMonitor:
                 
                 if owner and repo and pr_id:
                     cache_key = f"{platform}:{owner}/{repo}#{pr_id}"
-                    future = self.thread_pool.submit(self.get_pr_labels, platform, owner, repo, pr_id, force_refresh)
+                    future = self.thread_pool.submit(self.get_pr_details, platform, owner, repo, pr_id, force_refresh)
                     future_to_key[future] = cache_key
             
             # 收集结果
@@ -854,9 +867,21 @@ class PRMonitor:
             for future in as_completed(future_to_key):
                 cache_key = future_to_key[future]
                 try:
-                    results[cache_key] = future.result()
+                    pr_details = future.result()
+                    if pr_details:
+                        # 从PR详情中提取标签并转换为字典格式
+                        results[cache_key] = [
+                            {
+                                'id': label.id,
+                                'name': label.name,
+                                'color': label.color,
+                                'description': label.description
+                            } for label in pr_details.labels
+                        ]
+                    else:
+                        results[cache_key] = []
                 except Exception as e:
-                    logger.error(f"获取PR标签时出错 {cache_key}: {e}")
+                    logger.error(f"获取PR详情时出错 {cache_key}: {e}")
                     results[cache_key] = []
             
             return results
@@ -872,10 +897,21 @@ class PRMonitor:
                 if owner and repo and pr_id:
                     cache_key = f"{platform}:{owner}/{repo}#{pr_id}"
                     try:
-                        labels = self.get_pr_labels(platform, owner, repo, pr_id, force_refresh)
-                        results[cache_key] = labels
+                        pr_details = self.get_pr_details(platform, owner, repo, pr_id, force_refresh)
+                        if pr_details:
+                            # 从PR详情中提取标签并转换为字典格式
+                            results[cache_key] = [
+                                {
+                                    'id': label.id,
+                                    'name': label.name,
+                                    'color': label.color,
+                                    'description': label.description
+                                } for label in pr_details.labels
+                            ]
+                        else:
+                            results[cache_key] = []
                     except Exception as e:
-                        logger.error(f"获取PR标签时出错 {cache_key}: {e}")
+                        logger.error(f"获取PR详情时出错 {cache_key}: {e}")
                         results[cache_key] = []
             
             return results

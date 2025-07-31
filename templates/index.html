@@ -130,7 +130,7 @@
         <button class="btn btn-danger btn-sm" id="batch-delete-btn">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash me-1" viewBox="0 0 16 16">
                 <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
             </svg>
             批量删除
         </button>
@@ -521,7 +521,13 @@
             // 标签列
             const labelsCell = document.createElement('td');
             labelsCell.className = 'labels pr-labels-col';
-            labelsCell.innerHTML = createLabelHTML(prData.current_labels);
+            
+            // 从pr_details中获取labels，而不是依赖current_labels
+            let labels = [];
+            if (prData.pr_details && prData.pr_details.labels && Array.isArray(prData.pr_details.labels)) {
+                labels = prData.pr_details.labels;
+            }
+            labelsCell.innerHTML = createLabelHTML(labels);
             
             // 操作列
             const actionCell = document.createElement('td');
@@ -533,7 +539,7 @@
                     data-pr-id="${prData.pr_id}">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
                         <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                        <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                        <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
                     </svg>
                 </button>`;
             
@@ -674,7 +680,7 @@
                                 data-pr-id="${errorData.pr_id}">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
                                 <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                                <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                                <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
                             </svg>
                         </button>
                     </td>
@@ -701,7 +707,7 @@
                                 data-pr-id="${errorData.pr_id}">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
                                 <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                                <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                                <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
                             </svg>
                         </button>
                     </td>
@@ -720,7 +726,7 @@
             });
         }
 
-        // 流式更新监控中的PR标签（使用SSE）
+        // 流式更新监控中的PR标签（使用SSE实时加载）
         function updatePRLabelsStream() {
             const loadingIndicator = document.getElementById('loading-indicator');
             const loadingText = document.getElementById('loading-text');
@@ -729,17 +735,18 @@
             
             // 显示加载指示器
             loadingIndicator.classList.remove('d-none');
-            loadingText.textContent = '正在刷新PR数据...';
+            loadingText.textContent = '正在启动刷新...';
             loadingProgress.style.width = '0%';
             
-            // 标记所有现有行为"正在更新"状态，而不是清空
+            // 标记所有现有行为"正在更新"状态
             markAllRowsAsUpdating();
             
             // 创建EventSource连接
             const eventSource = new EventSource('/api/pr_labels_stream');
             
             eventSource.onopen = function() {
-                console.log('SSE连接已建立');
+                console.log('连接已建立');
+                loadingText.textContent = '连接建立，准备加载...';
             };
             
             eventSource.addEventListener('start', function(event) {
@@ -755,8 +762,6 @@
             eventSource.addEventListener('pr_error', function(event) {
                 const errorData = JSON.parse(event.data);
                 console.error(`加载PR数据失败 ${errorData.cache_key}:`, errorData.error);
-                
-                // 更新对应行为错误状态，如果不存在则添加新行
                 updateOrAddErrorRow(errorData);
             });
             
@@ -767,61 +772,49 @@
             });
             
             eventSource.addEventListener('complete', function(event) {
-                // 移除所有仍在"正在更新"状态的行（这些PR已经不在监控列表中了）
+                const data = JSON.parse(event.data);
+                
+                // 移除所有仍在"正在更新"状态的行
                 removeOutdatedRows();
                 
                 loadingIndicator.classList.add('d-none');
                 eventSource.close();
-                console.log('所有PR数据刷新完成');
-                showMessage('PR数据刷新完成', 'success');
+                
+                const message = data.elapsed ? 
+                    `PR数据刷新完成 (耗时: ${data.elapsed}s)` : 
+                    'PR数据刷新完成';
+                
+                console.log(message);
+                showMessage(message, 'success');
                 
                 // 应用标签颜色
                 applyLabelColors();
             });
             
-            eventSource.onerror = function(event) {
-                console.error('SSE连接错误:', event);
+            eventSource.addEventListener('error', function(event) {
+                const data = JSON.parse(event.data);
+                console.error('连接错误:', data.error);
                 loadingIndicator.classList.add('d-none');
                 eventSource.close();
-                showMessage('加载PR数据时发生错误，请稍后重试', 'danger');
+                showMessage('加载失败，请稍后重试', 'danger');
+            });
+            
+            eventSource.onerror = function(event) {
+                console.error('连接错误:', event);
+                loadingIndicator.classList.add('d-none');
+                eventSource.close();
+                showMessage('连接服务失败，请稍后重试', 'danger');
             };
         }
 
-        // 传统方式更新监控中的PR标签（作为备用）
-        function updatePRLabels() {
-            const tableBody = document.querySelector('#pr-table-body');
-            
-            // 标记所有现有行为"正在更新"状态
-            markAllRowsAsUpdating();
-            
-            fetch('/api/pr_labels')
-                .then(response => response.json())
-                .then(data => {
-                    for (const cacheKey in data) {
-                        const prInfo = data[cacheKey];
-                        updateOrAddPRToTable(prInfo);
-                    }
-                    
-                    // 移除所有仍在"正在更新"状态的行
-                    removeOutdatedRows();
-                    
-                    // 应用标签颜色
-                    applyLabelColors();
-                })
-                .catch(error => {
-                    console.error('Error fetching PR labels:', error);
-                    showMessage('加载PR数据失败，请检查网络连接', 'danger');
-                });
-        }
-
-        // 刷新所有数据（优先使用流式加载）
+        // 刷新所有数据（使用高性能流式加载）
         function refreshAllData() {
+            // 使用优化的流式API
             if (typeof EventSource !== 'undefined') {
-                updatePRLabelsStream();
+                updatePRLabelsStream(); // 高性能版本
             } else {
-                // 浏览器不支持SSE，使用传统方式
-                updatePRLabels();
-                showMessage('正在刷新所有数据...', 'info');
+                // 浏览器不支持SSE，显示错误信息
+                showMessage('您的浏览器不支持实时更新功能，请升级浏览器', 'warning');
             }
         }
 

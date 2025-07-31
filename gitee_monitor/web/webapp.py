@@ -4,10 +4,12 @@ Flask Web 应用模块，处理 Web 界面和 API 请求
 import logging
 import re
 import json
+import asyncio
 from flask import Flask, request, render_template, redirect, url_for, jsonify, Response
 
 from ..config.config_manager import Config
 from ..services.pr_monitor import PRMonitor
+from ..services.async_pr_monitor import AsyncPRMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +26,27 @@ class WebApp:
         """
         self.config = config
         self.pr_monitor = pr_monitor
+        # 初始化高性能PR监控器
+        self.async_pr_monitor = AsyncPRMonitor(config)
         self.app = Flask(__name__, 
                          template_folder='../../templates',
                          static_folder='../../static')
         self._register_routes()
+    
+    def _run_async_in_thread(self, coro):
+        """在新线程中运行异步函数"""
+        def run_in_thread():
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                return loop.run_until_complete(coro)
+            finally:
+                loop.close()
+        
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(run_in_thread)
+            return future.result()
         
     def _register_routes(self) -> None:
         """注册路由"""
@@ -148,151 +167,226 @@ class WebApp:
             
             return "Webhook 收到", 200
         
-        # PR 标签 API 端点
+        # PR 标签 API 端点 - 高性能版本
         @self.app.route('/api/pr_labels', methods=['GET'])
         def api_pr_labels():
-            force_refresh = request.args.get('refresh', '').lower() == 'true'
-            pr_data = {}
+            """高性能PR标签API，大幅提升刷新性能"""
+            
+            # 准备PR列表
+            pr_list = []
             
             # 获取配置列表中的PR
             for pr_config in self.config.get_pr_lists():
                 platform = pr_config.get("PLATFORM", "gitee")
-                owner = pr_config.get("OWNER")
-                repo = pr_config.get("REPO")
-                pr_id = pr_config.get("PULL_REQUEST_ID")
-                
-                if owner and repo and pr_id:
-                    cache_key = f"{platform}:{owner}/{repo}#{pr_id}"
-                    labels = self.pr_monitor.get_pr_labels(platform, owner, repo, pr_id, force_refresh=force_refresh)
-                    pr_details = self.pr_monitor.get_pr_details(platform, owner, repo, pr_id, force_refresh=force_refresh)
-                    
-                    pr_data[cache_key] = {
-                        "platform": platform,
-                        "current_labels": labels,  # 传递完整的标签对象，包含颜色信息
-                        "owner": owner,
-                        "repo": repo,
-                        "pr_id": pr_id,
-                        "pr_details": pr_details.to_dict() if pr_details else None  # 使用PullRequest对象的to_dict方法
-                    }
-            
-            # 获取关注作者的PR列表
-            try:
-                followed_author_prs = self.pr_monitor.get_followed_author_prs(force_refresh=force_refresh, auto_add_to_monitor=True)
-                for pr in followed_author_prs:
-                    cache_key = f"{pr.platform}:{pr.owner}/{pr.repo}#{pr.id}"
-                    # 避免重复添加已经在配置列表中的PR
-                    if cache_key not in pr_data:
-                        labels = self.pr_monitor.get_pr_labels(pr.platform, pr.owner, pr.repo, pr.id, force_refresh=force_refresh)
-                        pr_details = self.pr_monitor.get_pr_details(pr.platform, pr.owner, pr.repo, pr.id, force_refresh=force_refresh)
-                        
-                        pr_data[cache_key] = {
-                            "platform": pr.platform,
-                            "current_labels": labels,
-                            "owner": pr.owner,
-                            "repo": pr.repo,
-                            "pr_id": pr.id,
-                            "pr_details": pr_details.to_dict() if pr_details else None
-                        }
-            except Exception as e:
-                logger.warning(f"获取关注作者PR列表失败: {e}")
-            
-            return jsonify(pr_data)
-        
-        # 新的流式PR标签API端点，支持逐个返回PR数据
-        @self.app.route('/api/pr_labels_stream', methods=['GET'])
-        def api_pr_labels_stream():
-            force_refresh = request.args.get('refresh', '').lower() == 'true'
-            
-            def generate():
-                # 获取配置列表中的PR
-                pr_configs = self.config.get_pr_lists()
-                
-                # 获取关注作者的PR列表
-                followed_author_prs = self.pr_monitor.get_followed_author_prs(force_refresh=force_refresh, auto_add_to_monitor=True)
-                logger.debug(f"获取到关注作者的pr{[pr.to_dict() for pr in followed_author_prs]}")
-                # 合并所有PR数据
-                all_pr_data = []
-                
-                # 添加配置列表中的PR
-                for pr_config in pr_configs:
-                    platform = pr_config.get("PLATFORM", "gitee")
+                if platform == "gitee":  # 目前只支持Gitee的异步
                     owner = pr_config.get("OWNER")
                     repo = pr_config.get("REPO")
                     pr_id = pr_config.get("PULL_REQUEST_ID")
                     
                     if owner and repo and pr_id:
-                        all_pr_data.append({
-                            'type': 'config',
+                        pr_list.append({
                             'platform': platform,
                             'owner': owner,
                             'repo': repo,
-                            'pr_id': pr_id
+                            'pr_id': pr_id,
+                            'type': 'config'
                         })
-                
-                # 添加关注作者的PR
+            
+            # 获取关注作者的PR列表（使用同步方式获取列表，然后异步获取详情）
+            try:
+                followed_author_prs = self.pr_monitor.get_followed_author_prs(force_refresh=False, auto_add_to_monitor=True)
                 for pr in followed_author_prs:
-                    all_pr_data.append({
-                        'type': 'followed_author',
-                        'platform': pr.platform,
-                        'owner': pr.owner,
-                        'repo': pr.repo,
-                        'pr_id': pr.id
-                    })
+                    if pr.platform == "gitee":  # 目前只支持Gitee的异步
+                        # 避免重复添加已经在配置列表中的PR
+                        existing = any(
+                            p['platform'] == pr.platform and 
+                            p['owner'] == pr.owner and 
+                            p['repo'] == pr.repo and 
+                            p['pr_id'] == pr.number 
+                            for p in pr_list
+                        )
+                        if not existing:
+                            pr_list.append({
+                                'platform': pr.platform,
+                                'owner': pr.owner,
+                                'repo': pr.repo,
+                                'pr_id': pr.number,
+                                'type': 'followed_author'
+                            })
+            except Exception as e:
+                logger.warning(f"获取关注作者PR列表失败: {e}")
+            
+            if not pr_list:
+                return jsonify({})
+            
+            # 使用异步监控器并发获取所有PR信息
+            async def get_pr_data():
+                start_time = time.time()
+                logger.info(f"开始获取 {len(pr_list)} 个PR的信息...")
                 
-                total_prs = len(all_pr_data)
-                processed = 0
+                results = await self.async_pr_monitor.get_multiple_pr_info_async(pr_list)
+                
+                pr_data = {}
+                for i, pr_info in enumerate(results):
+                    if pr_info:
+                        pr_item = pr_list[i]
+                        cache_key = f"{pr_item['platform']}:{pr_item['owner']}/{pr_item['repo']}#{pr_item['pr_id']}"
+                        pr_data[cache_key] = {
+                            "platform": pr_item['platform'],
+                            "owner": pr_item['owner'],
+                            "repo": pr_item['repo'],
+                            "pr_id": pr_item['pr_id'],
+                            "pr_details": pr_info['pr_details']
+                        }
+                
+                end_time = time.time()
+                elapsed = end_time - start_time
+                logger.info(f"获取完成: {len(pr_data)} 个PR信息，耗时 {elapsed:.2f}s")
+                
+                return pr_data
+            
+            # 在线程中运行异步函数
+            import time
+            try:
+                pr_data = self._run_async_in_thread(get_pr_data())
+                return jsonify(pr_data)
+            except Exception as e:
+                logger.error(f"获取PR数据失败: {e}")
+                return jsonify({'error': str(e)}), 500
+        
+        # 流式PR标签API端点 - 高性能版本
+        @self.app.route('/api/pr_labels_stream', methods=['GET'])
+        def api_pr_labels_stream():
+            """高性能流式PR标签API，实时显示加载进度"""
+            
+            def generate():
+                import time
+                
+                # 准备PR列表（同上）
+                pr_list = []
+                
+                # 获取配置列表中的PR
+                for pr_config in self.config.get_pr_lists():
+                    platform = pr_config.get("PLATFORM", "gitee")
+                    if platform == "gitee":
+                        owner = pr_config.get("OWNER")
+                        repo = pr_config.get("REPO")
+                        pr_id = pr_config.get("PULL_REQUEST_ID")
+                        
+                        if owner and repo and pr_id:
+                            pr_list.append({
+                                'platform': platform,
+                                'owner': owner,
+                                'repo': repo,
+                                'pr_id': pr_id,
+                                'type': 'config'
+                            })
+                
+                # 获取关注作者的PR列表
+                try:
+                    followed_author_prs = self.pr_monitor.get_followed_author_prs(force_refresh=False, auto_add_to_monitor=True)
+                    for pr in followed_author_prs:
+                        if pr.platform == "gitee":
+                            existing = any(
+                                p['platform'] == pr.platform and 
+                                p['owner'] == pr.owner and 
+                                p['repo'] == pr.repo and 
+                                p['pr_id'] == pr.number 
+                                for p in pr_list
+                            )
+                            if not existing:
+                                pr_list.append({
+                                    'platform': pr.platform,
+                                    'owner': pr.owner,
+                                    'repo': pr.repo,
+                                    'pr_id': pr.number,
+                                    'type': 'followed_author'
+                                })
+                except Exception as e:
+                    logger.warning(f"获取关注作者PR列表失败: {e}")
+                
+                total_prs = len(pr_list)
                 
                 # 发送开始事件
-                yield f"event: start\ndata: {json.dumps({'total': total_prs})}\n\n"
+                yield f"event: start\ndata: {json.dumps({'total': total_prs, 'async': True})}\n\n"
                 
-                for pr_item in all_pr_data:
-                    platform = pr_item['platform']
-                    owner = pr_item['owner']
-                    repo = pr_item['repo']
-                    pr_id = pr_item['pr_id']
+                if total_prs == 0:
+                    yield f"event: complete\ndata: {json.dumps({'message': 'No PRs to load'})}\n\n"
+                    return
+                
+                # 异步获取所有PR信息
+                async def get_all_pr_data():
+                    start_time = time.time()
                     
-                    try:
-                        cache_key = f"{platform}:{owner}/{repo}#{pr_id}"
-                        labels = self.pr_monitor.get_pr_labels(platform, owner, repo, pr_id, force_refresh=force_refresh)
-                        pr_details = self.pr_monitor.get_pr_details(platform, owner, repo, pr_id, force_refresh=force_refresh)
-                        
-                        pr_data = {
-                            "cache_key": cache_key,
-                            "platform": platform,
-                            "current_labels": labels,
-                            "owner": owner,
-                            "repo": repo,
-                            "pr_id": pr_id,
-                            "pr_details": pr_details.to_dict() if pr_details else None
+                    # 创建进度回调
+                    def progress_callback(completed, total):
+                        progress_data = {
+                            "processed": completed,
+                            "total": total,
+                            "percentage": round((completed / total) * 100, 1) if total > 0 else 100,
+                            "async": True
                         }
-                        
-                        # 发送PR数据事件
-                        yield f"event: pr_data\ndata: {json.dumps(pr_data)}\n\n"
-                        
-                    except Exception as e:
-                        # 发送错误事件
-                        error_data = {
-                            "cache_key": f"{platform}:{owner}/{repo}#{pr_id}",
-                            "platform": platform,
-                            "error": str(e),
-                            "owner": owner,
-                            "repo": repo,
-                            "pr_id": pr_id
-                        }
-                        yield f"event: pr_error\ndata: {json.dumps(error_data)}\n\n"
-                        logger.error(f"获取{platform.upper()}PR数据失败 {owner}/{repo}#{pr_id}: {e}")
+                        # 注意：这里不能直接yield，需要另想办法
+                        return progress_data
+                    
+                    results = await self.async_pr_monitor.get_multiple_pr_info_async(pr_list)
+                    
+                    end_time = time.time()
+                    elapsed = end_time - start_time
+                    
+                    return results, elapsed
                 
-                    processed += 1
-                    # 发送进度事件
-                    progress_data = {
-                        "processed": processed,
-                        "total": total_prs,
-                        "percentage": round((processed / total_prs) * 100, 1) if total_prs > 0 else 100
+                try:
+                    # 在线程中运行异步函数
+                    results, elapsed = self._run_async_in_thread(get_all_pr_data())
+                    
+                    # 发送结果
+                    processed = 0
+                    for i, pr_info in enumerate(results):
+                        pr_item = pr_list[i]
+                        cache_key = f"{pr_item['platform']}:{pr_item['owner']}/{pr_item['repo']}#{pr_item['pr_id']}"
+                        
+                        if pr_info:
+                            pr_data = {
+                                "cache_key": cache_key,
+                                "platform": pr_item['platform'],
+                                "owner": pr_item['owner'],
+                                "repo": pr_item['repo'],
+                                "pr_id": pr_item['pr_id'],
+                                "pr_details": pr_info['pr_details']
+                            }
+                            yield f"event: pr_data\ndata: {json.dumps(pr_data)}\n\n"
+                        else:
+                            error_data = {
+                                "cache_key": cache_key,
+                                "platform": pr_item['platform'],
+                                "error": "Failed to fetch PR data",
+                                "owner": pr_item['owner'],
+                                "repo": pr_item['repo'],
+                                "pr_id": pr_item['pr_id']
+                            }
+                            yield f"event: pr_error\ndata: {json.dumps(error_data)}\n\n"
+                        
+                        processed += 1
+                        progress_data = {
+                            "processed": processed,
+                            "total": total_prs,
+                            "percentage": round((processed / total_prs) * 100, 1)
+                        }
+                        yield f"event: progress\ndata: {json.dumps(progress_data)}\n\n"
+                    
+                    # 发送完成事件
+                    complete_data = {
+                        'message': f'加载完成，耗时 {elapsed:.2f}s',
+                        'elapsed': elapsed,
+                        'total': total_prs
                     }
-                    yield f"event: progress\ndata: {json.dumps(progress_data)}\n\n"
-                
-                # 发送完成事件
-                yield f"event: complete\ndata: {json.dumps({'message': 'All PR data loaded'})}\n\n"
+                    yield f"event: complete\ndata: {json.dumps(complete_data)}\n\n"
+                    
+                except Exception as e:
+                    error_data = {'error': str(e)}
+                    yield f"event: error\ndata: {json.dumps(error_data)}\n\n"
+                    logger.error(f"流式获取PR数据失败: {e}")
             
             return Response(generate(), mimetype='text/event-stream',
                           headers={
@@ -344,14 +438,11 @@ class WebApp:
             self.config.save_config()
             logger.info(f"通过 API 添加 {platform.upper()} PR #{pr_id} ({owner}/{repo}) 到监控列表")
             
-            # 获取新添加PR的标签信息
+            # 获取新添加PR的详细信息
             try:
-                labels = self.pr_monitor.get_pr_labels(platform, owner, repo, pr_id)
                 pr_details = self.pr_monitor.get_pr_details(platform, owner, repo, pr_id)
-                current_labels = labels  # 传递完整的标签对象
             except Exception as e:
                 logger.warning(f"获取新添加{platform.upper()}PR的信息失败: {e}")
-                current_labels = []
                 pr_details = None
             
             return jsonify({
@@ -362,7 +453,6 @@ class WebApp:
                     'owner': owner,
                     'repo': repo,
                     'pr_id': pr_id,
-                    'current_labels': current_labels,
                     'pr_details': pr_details.to_dict() if pr_details else None,
                     'cache_key': f"{platform}:{owner}/{repo}#{pr_id}"
                 }
