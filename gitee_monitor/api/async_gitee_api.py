@@ -6,6 +6,7 @@ import logging
 from typing import List, Dict, Any, Optional
 
 from .async_base_api import AsyncBaseAPIClient
+from .async_api_client_factory import AsyncAPIClientFactory
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,15 @@ class AsyncGiteeAPIClient(AsyncBaseAPIClient):
             logger.error(f"异步获取 PR #{pr_id} 详情失败: {e}")
             return None
     
-    async def get_author_prs(self, owner: str, repo: str, author: str) -> Optional[List[Dict[str, Any]]]:
+    async def get_author_prs(
+        self,
+        owner: str,
+        repo: str,
+        author: str,
+        state: str = "open",
+        page: int = 1,
+        per_page: int = 20,
+    ) -> Optional[List[Dict[str, Any]]]:
         """
         异步获取指定作者在指定仓库的所有PR
         
@@ -74,26 +83,33 @@ class AsyncGiteeAPIClient(AsyncBaseAPIClient):
             owner: 仓库拥有者
             repo: 仓库名称
             author: 作者用户名
+            state: PR 状态，可选 open/closed/all
+            page: 页码
+            per_page: 每页数量
             
         Returns:
             PR列表，出错时返回 None
         """
         url = f"{self.api_url}/repos/{owner}/{repo}/pulls"
         params = {
-            "state": "all",
-            "sort": "updated",
+            "state": state,
+            "sort": "created",
             "direction": "desc",
-            "per_page": 100  # 获取更多PR以确保找到所有该作者的PR
+            "page": page,
+            "per_page": per_page,
+            "author": author,
         }
+
+        if self.access_token:
+            params["access_token"] = self.access_token
         
         try:
             result = await self._make_request("GET", url, params=params)
             if result is not None:
-                # 过滤出指定作者的PR
-                author_prs = [pr for pr in result if pr.get('user', {}).get('login') == author]
-                logger.debug(f"异步获取作者 {author} 的PR成功: {len(author_prs)} 个PR")
-                return author_prs
-            return None
+                logger.debug(
+                    f"异步获取作者 {author} 的PR成功: {len(result)} 个"
+                )
+            return result
         except Exception as e:
             logger.error(f"异步获取作者 {author} 的PR失败: {e}")
             return None
@@ -177,5 +193,9 @@ class AsyncGiteeAPIClient(AsyncBaseAPIClient):
                 processed_results.append(None)
             else:
                 processed_results.append(result)
-        
+
         return processed_results
+
+
+# 在工厂中注册
+AsyncAPIClientFactory.register_client("gitee", AsyncGiteeAPIClient)
