@@ -45,7 +45,7 @@
                                     <div class="mb-3">
                                         <label for="gitee_access_token" class="form-label">Gitee 访问令牌:</label>
                                         <input type="password" class="form-control" id="gitee_access_token" name="gitee_access_token"
-                                            value="{{ config.get('ACCESS_TOKEN', '') }}" placeholder="输入 Gitee Access Token">
+                                            value="{{ config.get_access_token('gitee') }}" placeholder="输入 Gitee Access Token">
                                         <div class="form-text">用于访问 Gitee API 的访问令牌</div>
                                     </div>
                                 </div>
@@ -65,7 +65,7 @@
                                     <div class="mb-3">
                                         <label for="github_access_token" class="form-label">GitHub 访问令牌:</label>
                                         <input type="password" class="form-control" id="github_access_token" name="github_access_token"
-                                            value="{{ config.get('GITHUB_ACCESS_TOKEN', '') }}" placeholder="输入 GitHub Access Token">
+                                            value="{{ config.get_access_token('github') }}" placeholder="输入 GitHub Access Token">
                                         <div class="form-text">用于访问 GitHub API 的访问令牌 (可选)</div>
                                     </div>
                                 </div>

@@ -129,27 +129,24 @@ class PRMonitor:
         # 如果没有指定平台，则自动检测配置中需要的平台
         if platforms is None:
             detected_platforms = set()
-            
-            # 从PR列表中检测平台，但只有在有相应访问令牌时才添加
+            available_platforms = {
+                p.get("NAME") for p in self.config.get_platforms()
+                if p.get("ACCESS_TOKEN")
+            }
+
             for pr_config in self.config.get_pr_lists():
                 platform = pr_config.get("PLATFORM", "gitee")
-                if platform == "gitee" and self.config.get("ACCESS_TOKEN"):
+                if platform in available_platforms:
                     detected_platforms.add(platform)
-                elif platform == "github" and self.config.get("GITHUB_ACCESS_TOKEN"):
-                    detected_platforms.add(platform)
-                
-            # 从关注作者列表中检测平台，但只有在有相应访问令牌时才添加
+
             for author_config in self.config.get_followed_authors():
                 platform = author_config.get("PLATFORM", "gitee")
-                if platform == "gitee" and self.config.get("ACCESS_TOKEN"):
+                if platform in available_platforms:
                     detected_platforms.add(platform)
-                elif platform == "github" and self.config.get("GITHUB_ACCESS_TOKEN"):
-                    detected_platforms.add(platform)
-                
-            # 如果没有检测到任何平台，默认添加gitee（如果有令牌）
-            if not detected_platforms and self.config.get("ACCESS_TOKEN"):
-                detected_platforms.add("gitee")
-                
+
+            if not detected_platforms:
+                detected_platforms = available_platforms
+
             self.platforms = list(detected_platforms)
             logger.info(f"自动检测到需要的平台: {self.platforms}")
         else:
@@ -159,14 +156,10 @@ class PRMonitor:
         self.api_clients: Dict[str, BaseAPIClient] = {}
         
         for platform in self.platforms:
-            # 根据平台获取相应的配置
-            if platform == 'gitee':
-                api_url = self.config.get("GITEA_URL")
-                access_token = self.config.get("ACCESS_TOKEN")
-            elif platform == 'github':
-                api_url = self.config.get("GITHUB_URL", "https://api.github.com")
-                access_token = self.config.get("GITHUB_ACCESS_TOKEN")
-            else:
+            platform_cfg = self.config.get_platform_config(platform)
+            api_url = platform_cfg.get("API_URL")
+            access_token = platform_cfg.get("ACCESS_TOKEN")
+            if not platform_cfg:
                 logger.warning(f"不支持的平台: {platform}")
                 continue
                 
