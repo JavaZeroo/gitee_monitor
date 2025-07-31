@@ -85,7 +85,15 @@ class AsyncBaseAPIClient(ABC):
         pass
     
     @abstractmethod
-    async def get_author_prs(self, owner: str, repo: str, author: str) -> Optional[List[Dict[str, Any]]]:
+    async def get_author_prs(
+        self,
+        owner: str,
+        repo: str,
+        author: str,
+        state: str = "open",
+        page: int = 1,
+        per_page: int = 20,
+    ) -> Optional[List[Dict[str, Any]]]:
         """
         异步获取指定作者在指定仓库的所有PR
         
@@ -93,6 +101,9 @@ class AsyncBaseAPIClient(ABC):
             owner: 仓库拥有者
             repo: 仓库名称
             author: 作者用户名
+            state: PR 状态，可选 open/closed/all
+            page: 页码
+            per_page: 每页数量
             
         Returns:
             PR列表，出错时返回None
@@ -156,3 +167,11 @@ class AsyncBaseAPIClient(ABC):
         except Exception as e:
             logger.error(f"Unexpected error: {method} {url} - {e}")
             return None
+
+    def get_platform_name(self) -> str:
+        """获取平台名称"""
+        return self.__class__.__name__.lower().replace('apiclient', '')
+
+    def validate_config(self) -> bool:
+        """验证配置是否有效"""
+        return bool(self.api_url and self.access_token)
