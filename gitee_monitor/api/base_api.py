@@ -5,6 +5,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 import logging
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ class BaseAPIClient(ABC):
         pass
     
     @abstractmethod
-    def get_pr_labels(self, owner: str, repo: str, pr_id: int) -> Optional[List[Dict[str, Any]]]:
+    async def get_pr_labels(self, owner: str, repo: str, pr_id: int) -> Optional[List[Dict[str, Any]]]:
         """
         获取指定PR的标签列表
         
@@ -54,7 +55,7 @@ class BaseAPIClient(ABC):
         pass
     
     @abstractmethod
-    def get_pr_details(self, owner: str, repo: str, pr_id: int) -> Optional[Dict[str, Any]]:
+    async def get_pr_details(self, owner: str, repo: str, pr_id: int) -> Optional[Dict[str, Any]]:
         """
         获取指定PR的详细信息
         
@@ -69,7 +70,7 @@ class BaseAPIClient(ABC):
         pass
     
     @abstractmethod
-    def get_author_prs(self, owner: str, repo: str, author: str, 
+    async def get_author_prs(self, owner: str, repo: str, author: str,
                       state: str = "open", page: int = 1, per_page: int = 20) -> Optional[List[Dict[str, Any]]]:
         """
         获取指定作者在特定仓库的PR列表
@@ -104,3 +105,28 @@ class BaseAPIClient(ABC):
             配置是否有效
         """
         return bool(self.api_url and self.access_token)
+
+    async def __aenter__(self):
+        self._session = aiohttp.ClientSession(headers=self.headers, timeout=aiohttp.ClientTimeout(total=30))
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if getattr(self, "_session", None):
+            await self._session.close()
+            self._session = None
+
+    async def _make_request(self, method: str, url: str, **kwargs) -> Optional[Dict[str, Any]]:
+        session = getattr(self, "_session", None)
+        if session is None:
+            async with aiohttp.ClientSession(headers=self.headers, timeout=aiohttp.ClientTimeout(total=30)) as temp_session:
+                return await self._request_with_session(temp_session, method, url, **kwargs)
+        return await self._request_with_session(session, method, url, **kwargs)
+
+    async def _request_with_session(self, session: aiohttp.ClientSession, method: str, url: str, **kwargs) -> Optional[Dict[str, Any]]:
+        try:
+            async with session.request(method, url, **kwargs) as resp:
+                resp.raise_for_status()
+                return await resp.json()
+        except aiohttp.ClientError as e:
+            logger.error(f"Request failed: {method} {url} - {e}")
+            return None

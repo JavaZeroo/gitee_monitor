@@ -285,7 +285,7 @@ class ActionExecutor:
         pr_number = pr_data.get('number', 0)
         
         try:
-            result = api_client.add_pr_labels(owner, repo, pr_number, labels)
+            result = await api_client.add_pr_labels(owner, repo, pr_number, labels)
             logger.info(f"成功添加标签到 PR {owner}/{repo}#{pr_number}: {labels}")
             return result is not None
         except Exception as e:
@@ -305,7 +305,7 @@ class ActionExecutor:
         
         try:
             for label in labels:
-                api_client.remove_pr_label(owner, repo, pr_number, label)
+                await api_client.remove_pr_label(owner, repo, pr_number, label)
             logger.info(f"成功移除标签从 PR {owner}/{repo}#{pr_number}: {labels}")
             return True
         except Exception as e:

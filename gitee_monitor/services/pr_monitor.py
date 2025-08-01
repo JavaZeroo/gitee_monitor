@@ -4,6 +4,7 @@ PR 监控服务模块，处理 PR 标签的监控和通知
 import time
 import logging
 import threading
+import asyncio
 from typing import Dict, Any, Set, List, Optional
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -50,55 +51,42 @@ def rate_limit(calls_per_second: float = 2.0):
 
 class PRCache:
     """PR 数据缓存，避免频繁 API 调用"""
-    
+
     def __init__(self, ttl: int = 300):
-        """
-        初始化缓存
-        
-        Args:
-            ttl: 缓存生存时间（秒）
-        """
-        self.cache: Dict[str, Dict[str, Any]] = {}  # 使用字符串key支持多仓库
+        self.cache: Dict[str, Dict[str, Any]] = {}
         self.ttl = ttl
-    
-    def get(self, cache_key: str) -> Optional[Dict[str, Any]]:
-        """
-        获取缓存的 PR 数据
-        
-        Args:
-            cache_key: 缓存键，格式为 "owner/repo#pr_id"
-            
-        Returns:
-            缓存的 PR 数据，如果缓存不存在或已过期则返回 None
-        """
-        if cache_key in self.cache:
-            entry = self.cache[cache_key]
-            if datetime.now() < entry["expires"]:
-                return entry["data"]
-        return None
-    
-    def set(self, cache_key: str, data: Dict[str, Any]) -> None:
-        """
-        设置 PR 数据缓存
-        
-        Args:
-            cache_key: 缓存键，格式为 "owner/repo#pr_id"
-            data: PR 数据
-        """
-        self.cache[cache_key] = {
-            "data": data,
-            "expires": datetime.now() + timedelta(seconds=self.ttl)
-        }
-    
-    def invalidate(self, cache_key: str) -> None:
-        """
-        使指定 PR 的缓存失效
-        
-        Args:
-            cache_key: 缓存键，格式为 "owner/repo#pr_id"
-        """
-        if cache_key in self.cache:
-            del self.cache[cache_key]
+        self._lock = asyncio.Lock()
+
+    async def get(self, cache_key: str) -> Optional[Dict[str, Any]]:
+        async with self._lock:
+            if cache_key in self.cache:
+                entry = self.cache[cache_key]
+                if datetime.now() < entry["expires"]:
+                    return entry["data"]
+                else:
+                    del self.cache[cache_key]
+            return None
+
+    async def set(self, cache_key: str, data: Dict[str, Any]) -> None:
+        async with self._lock:
+            self.cache[cache_key] = {
+                "data": data,
+                "expires": datetime.now() + timedelta(seconds=self.ttl)
+            }
+
+    async def invalidate(self, cache_key: str) -> None:
+        async with self._lock:
+            if cache_key in self.cache:
+                del self.cache[cache_key]
+
+    async def clear_expired(self) -> None:
+        async with self._lock:
+            now = datetime.now()
+            expired_keys = [key for key, entry in self.cache.items() if now >= entry["expires"]]
+            for key in expired_keys:
+                del self.cache[key]
+            if expired_keys:
+                logger.debug(f"清除了 {len(expired_keys)} 个过期缓存条目")
 
 
 class PRMonitor:
@@ -181,6 +169,14 @@ class PRMonitor:
         self.pr_labels: Dict[str, Set[str]] = {}  # 保存每个 PR 的最新标签，key格式为 "platform:owner/repo#pr_id"
         self.running = False
         self.poll_thread = None
+
+        # 异步相关设置
+        self.max_concurrent_requests = self.config.get("MAX_CONCURRENT_REQUESTS", 10)
+        self.semaphore = asyncio.Semaphore(self.max_concurrent_requests)
+        self.requests_per_second = self.config.get("REQUESTS_PER_SECOND_ASYNC", 5.0)
+        self.min_request_interval = 1.0 / self.requests_per_second
+        self.last_request_time = 0.0
+        self._rate_limit_lock = asyncio.Lock()
         
         # 初始化自动化引擎
         automation_config_dict = self.config.get_automation_config()
@@ -246,10 +242,10 @@ class PRMonitor:
         cache_key = f"{platform}:{owner}/{repo}#{pr_id}_details"
         
         if force_refresh:
-            self.cache.invalidate(cache_key)
-            
+            asyncio.run(self.cache.invalidate(cache_key))
+
         # 检查缓存
-        cached_data = self.cache.get(cache_key)
+        cached_data = asyncio.run(self.cache.get(cache_key))
         if cached_data:
             # 确保缓存数据包含平台信息
             if 'platform' not in cached_data:
@@ -262,11 +258,11 @@ class PRMonitor:
             logger.warning(f"无法获取 {platform} API客户端")
             return None
             
-        pr_data = api_client.get_pr_details(owner, repo, pr_id)
+        pr_data = asyncio.run(api_client.get_pr_details(owner, repo, pr_id))
         if pr_data:
             # 确保PR数据包含平台信息
             pr_data['platform'] = platform
-            self.cache.set(cache_key, pr_data)
+            asyncio.run(self.cache.set(cache_key, pr_data))
             return PullRequest.from_dict(pr_data)
         return None
     
@@ -288,10 +284,10 @@ class PRMonitor:
         cache_key = f"{platform}:{owner}/{repo}#{pr_id}"
         
         if force_refresh:
-            self.cache.invalidate(cache_key)
-            
+            asyncio.run(self.cache.invalidate(cache_key))
+
         # 检查缓存
-        cached_data = self.cache.get(cache_key)
+        cached_data = asyncio.run(self.cache.get(cache_key))
         if cached_data:
             return cached_data
             
@@ -301,9 +297,9 @@ class PRMonitor:
             logger.warning(f"无法获取 {platform} API客户端")
             return []
             
-        labels = api_client.get_pr_labels(owner, repo, pr_id)
+        labels = asyncio.run(api_client.get_pr_labels(owner, repo, pr_id))
         if labels:
-            self.cache.set(cache_key, labels)
+            asyncio.run(self.cache.set(cache_key, labels))
             return labels
         return []
     
@@ -406,10 +402,10 @@ class PRMonitor:
                 cache_key = f"{platform}:{author}@{owner}/{repo}"
                 
                 if force_refresh:
-                    self.cache.invalidate(cache_key)
-                
+                    asyncio.run(self.cache.invalidate(cache_key))
+
                 # 检查缓存
-                cached_data = self.cache.get(cache_key)
+                cached_data = asyncio.run(self.cache.get(cache_key))
                 if cached_data:
                     # 直接使用缓存数据
                     for pr_data in cached_data:
@@ -478,7 +474,7 @@ class PRMonitor:
             logger.warning(f"无法获取 {platform} API客户端")
             return []
         
-        return api_client.get_author_prs(owner, repo, author) or []
+        return asyncio.run(api_client.get_author_prs(owner, repo, author)) or []
     
     def _process_author_prs_data(self, prs_data: List[Dict[str, Any]], platform: str, author: str, owner: str, repo: str, auto_add_to_monitor: bool, all_prs: List[PullRequest]):
         """
@@ -495,7 +491,7 @@ class PRMonitor:
         """
         if prs_data:
             cache_key = f"{platform}:{author}@{owner}/{repo}"
-            self.cache.set(cache_key, prs_data)
+            asyncio.run(self.cache.set(cache_key, prs_data))
             
             # 将PR数据转换为PullRequest对象
             for pr_data in prs_data:
@@ -748,8 +744,8 @@ class PRMonitor:
                 if cache_key in self.pr_labels:
                     del self.pr_labels[cache_key]
                 
-                self.cache.invalidate(cache_key)
-                self.cache.invalidate(f"{cache_key}_details")
+                asyncio.run(self.cache.invalidate(cache_key))
+                asyncio.run(self.cache.invalidate(f"{cache_key}_details"))
                 
                 return True
             else:
@@ -946,3 +942,85 @@ class PRMonitor:
             "thread_pool_active": self.thread_pool is not None and not self.thread_pool._shutdown if self.thread_pool else False,
             "monitor_running": self.running
         }
+
+    async def _rate_limit_async(self):
+        async with self._rate_limit_lock:
+            now = time.time()
+            elapsed = now - self.last_request_time
+            if elapsed < self.min_request_interval:
+                await asyncio.sleep(self.min_request_interval - elapsed)
+            self.last_request_time = time.time()
+
+    async def get_pr_info_async(self, owner: str, repo: str, pr_id: int) -> Optional[Dict[str, Any]]:
+        cache_key = f"{owner}/{repo}#{pr_id}"
+        cached = await self.cache.get(cache_key)
+        if cached:
+            logger.debug(f"从缓存获取 PR #{pr_id} 信息")
+            return cached
+
+        async with self.semaphore:
+            await self._rate_limit_async()
+            async with gitee_api.GiteeAPIClient(self.config.get_api_url('gitee'), self.config.get_access_token('gitee')) as client:
+                pr_details = await client.get_pr_details(owner, repo, pr_id)
+                if pr_details:
+                    pr_info = {
+                        "pr_details": pr_details,
+                        "last_updated": datetime.now().isoformat()
+                    }
+                    await self.cache.set(cache_key, pr_info)
+                    logger.debug(f"异步获取并缓存 PR #{pr_id} 信息成功")
+                    return pr_info
+                logger.warning(f"异步获取 PR #{pr_id} 信息失败")
+                return None
+
+    async def get_multiple_pr_info_async(self, pr_list: List[Dict[str, Any]]) -> List[Optional[Dict[str, Any]]]:
+        start_time = time.time()
+        tasks = [self.get_pr_info_async(pr['owner'], pr['repo'], pr['pr_id']) for pr in pr_list]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        processed = []
+        for r in results:
+            if isinstance(r, Exception):
+                logger.error(f"获取 PR 信息时出现异常: {r}")
+                processed.append(None)
+            else:
+                processed.append(r)
+        elapsed = time.time() - start_time
+        success_count = sum(1 for r in processed if r is not None)
+        logger.info(f"并发获取 {len(pr_list)} 个PR信息完成: {success_count} 成功, 耗时 {elapsed:.2f}s")
+        return processed
+
+    async def get_author_prs_async(self, owner: str, repo: str, author: str) -> List[Dict[str, Any]]:
+        async with self.semaphore:
+            await self._rate_limit_async()
+            async with gitee_api.GiteeAPIClient(self.config.get_api_url('gitee'), self.config.get_access_token('gitee')) as client:
+                prs = await client.get_author_prs(owner, repo, author)
+                if not prs:
+                    return []
+                pr_list = [{"owner": owner, "repo": repo, "pr_id": pr.get('number')} for pr in prs if pr.get('number')]
+        pr_info_list = await self.get_multiple_pr_info_async(pr_list)
+        valid = [info for info in pr_info_list if info is not None]
+        logger.info(f"异步获取作者 {author} 的 {len(valid)} 个PR信息完成")
+        return valid
+
+    async def refresh_cache_async(self) -> None:
+        await self.cache.clear_expired()
+        logger.debug("异步缓存刷新完成")
+
+    async def add_pr_labels_async(self, owner: str, repo: str, pr_id: int, labels: List[str]) -> bool:
+        async with self.semaphore:
+            await self._rate_limit_async()
+            async with gitee_api.GiteeAPIClient(self.config.get_api_url('gitee'), self.config.get_access_token('gitee')) as client:
+                result = await client.add_pr_labels(owner, repo, pr_id, labels)
+                success = result is not None
+                if success:
+                    await self.cache.invalidate(f"{owner}/{repo}#{pr_id}")
+                return success
+
+    async def remove_pr_label_async(self, owner: str, repo: str, pr_id: int, label: str) -> bool:
+        async with self.semaphore:
+            await self._rate_limit_async()
+            async with gitee_api.GiteeAPIClient(self.config.get_api_url('gitee'), self.config.get_access_token('gitee')) as client:
+                success = await client.remove_pr_label(owner, repo, pr_id, label)
+                if success:
+                    await self.cache.invalidate(f"{owner}/{repo}#{pr_id}")
+                return success
