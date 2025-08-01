@@ -258,7 +258,7 @@ class PRMonitor:
             logger.warning(f"无法获取 {platform} API客户端")
             return None
             
-        pr_data = api_client.get_pr_details(owner, repo, pr_id)
+        pr_data = asyncio.run(api_client.get_pr_details(owner, repo, pr_id))
         if pr_data:
             # 确保PR数据包含平台信息
             pr_data['platform'] = platform
@@ -297,7 +297,7 @@ class PRMonitor:
             logger.warning(f"无法获取 {platform} API客户端")
             return []
             
-        labels = api_client.get_pr_labels(owner, repo, pr_id)
+        labels = asyncio.run(api_client.get_pr_labels(owner, repo, pr_id))
         if labels:
             asyncio.run(self.cache.set(cache_key, labels))
             return labels
@@ -474,7 +474,7 @@ class PRMonitor:
             logger.warning(f"无法获取 {platform} API客户端")
             return []
         
-        return api_client.get_author_prs(owner, repo, author) or []
+        return asyncio.run(api_client.get_author_prs(owner, repo, author)) or []
     
     def _process_author_prs_data(self, prs_data: List[Dict[str, Any]], platform: str, author: str, owner: str, repo: str, auto_add_to_monitor: bool, all_prs: List[PullRequest]):
         """
@@ -961,7 +961,7 @@ class PRMonitor:
         async with self.semaphore:
             await self._rate_limit_async()
             async with gitee_api.GiteeAPIClient(self.config.get_api_url('gitee'), self.config.get_access_token('gitee')) as client:
-                pr_details = await client.get_pr_details_async(owner, repo, pr_id)
+                pr_details = await client.get_pr_details(owner, repo, pr_id)
                 if pr_details:
                     pr_info = {
                         "pr_details": pr_details,
@@ -993,7 +993,7 @@ class PRMonitor:
         async with self.semaphore:
             await self._rate_limit_async()
             async with gitee_api.GiteeAPIClient(self.config.get_api_url('gitee'), self.config.get_access_token('gitee')) as client:
-                prs = await client.get_author_prs_async(owner, repo, author)
+                prs = await client.get_author_prs(owner, repo, author)
                 if not prs:
                     return []
                 pr_list = [{"owner": owner, "repo": repo, "pr_id": pr.get('number')} for pr in prs if pr.get('number')]
@@ -1010,7 +1010,7 @@ class PRMonitor:
         async with self.semaphore:
             await self._rate_limit_async()
             async with gitee_api.GiteeAPIClient(self.config.get_api_url('gitee'), self.config.get_access_token('gitee')) as client:
-                result = await client.add_pr_labels_async(owner, repo, pr_id, labels)
+                result = await client.add_pr_labels(owner, repo, pr_id, labels)
                 success = result is not None
                 if success:
                     await self.cache.invalidate(f"{owner}/{repo}#{pr_id}")
@@ -1020,7 +1020,7 @@ class PRMonitor:
         async with self.semaphore:
             await self._rate_limit_async()
             async with gitee_api.GiteeAPIClient(self.config.get_api_url('gitee'), self.config.get_access_token('gitee')) as client:
-                success = await client.remove_pr_label_async(owner, repo, pr_id, label)
+                success = await client.remove_pr_label(owner, repo, pr_id, label)
                 if success:
                     await self.cache.invalidate(f"{owner}/{repo}#{pr_id}")
                 return success

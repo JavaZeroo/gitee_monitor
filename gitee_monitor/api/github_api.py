@@ -1,9 +1,9 @@
 """
 GitHub API 客户端模块，处理与 GitHub API 的所有交互
 """
-import requests
 import logging
 from typing import List, Dict, Any, Optional
+import aiohttp
 
 from .base_api import BaseAPIClient
 from .api_client_factory import APIClientFactory
@@ -28,7 +28,7 @@ class GitHubAPIClient(BaseAPIClient):
             headers["Authorization"] = f"token {self.access_token}"
         return headers
         
-    def get_pr_labels(self, owner: str, repo: str, pr_id: int) -> Optional[List[Dict[str, Any]]]:
+    async def get_pr_labels(self, owner: str, repo: str, pr_id: int) -> Optional[List[Dict[str, Any]]]:
         """
         获取指定 PR 的标签列表
         
@@ -41,17 +41,12 @@ class GitHubAPIClient(BaseAPIClient):
             标签列表，出错时返回 None
         """
         url = f"{self.api_url}/repos/{owner}/{repo}/issues/{pr_id}/labels"
-        try:
-            response = requests.get(url, headers=self.headers, timeout=10)
-            response.raise_for_status()
-            labels = response.json()
-            logger.debug(f"获取 GitHub PR #{pr_id} 标签成功: {[label.get('name', '') for label in labels]}")
-            return labels
-        except requests.RequestException as e:
-            logger.error(f"获取 GitHub PR #{pr_id} 标签失败: {e}")
-            return None
+        result = await self._make_request("GET", url)
+        if result is not None:
+            logger.debug(f"获取 GitHub PR #{pr_id} 标签成功: {[label.get('name', '') for label in result]}")
+        return result
     
-    def get_pr_details(self, owner: str, repo: str, pr_id: int) -> Optional[Dict[str, Any]]:
+    async def get_pr_details(self, owner: str, repo: str, pr_id: int) -> Optional[Dict[str, Any]]:
         """
         获取指定 PR 的详细信息
         
@@ -64,17 +59,12 @@ class GitHubAPIClient(BaseAPIClient):
             PR 详细信息，出错时返回 None
         """
         url = f"{self.api_url}/repos/{owner}/{repo}/pulls/{pr_id}"
-        try:
-            response = requests.get(url, headers=self.headers, timeout=10)
-            response.raise_for_status()
-            pr_details = response.json()
+        result = await self._make_request("GET", url)
+        if result is not None:
             logger.debug(f"获取 GitHub PR #{pr_id} 详情成功")
-            return pr_details
-        except requests.RequestException as e:
-            logger.error(f"获取 GitHub PR #{pr_id} 详情失败: {e}")
-            return None
+        return result
             
-    def get_author_prs(self, owner: str, repo: str, author: str, state: str = "open", page: int = 1, per_page: int = 20) -> Optional[List[Dict[str, Any]]]:
+    async def get_author_prs(self, owner: str, repo: str, author: str, state: str = "open", page: int = 1, per_page: int = 20) -> Optional[List[Dict[str, Any]]]:
         """
         获取指定作者在特定仓库的PR列表
         
@@ -98,20 +88,14 @@ class GitHubAPIClient(BaseAPIClient):
             "per_page": per_page
         }
         
-        try:
-            response = requests.get(url, params=params, headers=self.headers, timeout=10)
-            response.raise_for_status()
-            prs = response.json()
-            
-            # GitHub API不支持按作者筛选，需要在客户端筛选
+        result = await self._make_request("GET", url, params=params)
+        if result is not None:
             if author:
-                prs = [pr for pr in prs if pr.get('user', {}).get('login') == author]
-            
-            logger.debug(f"获取作者 {author} 在 {owner}/{repo} 的GitHub PR列表成功，共 {len(prs)} 个")
-            return prs
-        except requests.RequestException as e:
-            logger.error(f"获取作者 {author} 在 {owner}/{repo} 的GitHub PR列表失败: {e}")
-            return None
+                result = [pr for pr in result if pr.get('user', {}).get('login') == author]
+            logger.debug(f"获取作者 {author} 在 {owner}/{repo} 的GitHub PR列表成功，共 {len(result)} 个")
+            return result
+        logger.error(f"获取作者 {author} 在 {owner}/{repo} 的GitHub PR列表失败")
+        return None
 
 
 # 注册GitHubAPIClient到工厂

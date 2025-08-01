@@ -40,7 +40,7 @@ class BaseAPIClient(ABC):
         pass
     
     @abstractmethod
-    def get_pr_labels(self, owner: str, repo: str, pr_id: int) -> Optional[List[Dict[str, Any]]]:
+    async def get_pr_labels(self, owner: str, repo: str, pr_id: int) -> Optional[List[Dict[str, Any]]]:
         """
         获取指定PR的标签列表
         
@@ -55,7 +55,7 @@ class BaseAPIClient(ABC):
         pass
     
     @abstractmethod
-    def get_pr_details(self, owner: str, repo: str, pr_id: int) -> Optional[Dict[str, Any]]:
+    async def get_pr_details(self, owner: str, repo: str, pr_id: int) -> Optional[Dict[str, Any]]:
         """
         获取指定PR的详细信息
         
@@ -70,7 +70,7 @@ class BaseAPIClient(ABC):
         pass
     
     @abstractmethod
-    def get_author_prs(self, owner: str, repo: str, author: str, 
+    async def get_author_prs(self, owner: str, repo: str, author: str,
                       state: str = "open", page: int = 1, per_page: int = 20) -> Optional[List[Dict[str, Any]]]:
         """
         获取指定作者在特定仓库的PR列表
