@@ -627,25 +627,32 @@ class PRMonitor:
             added: 新增的标签
             removed: 移除的标签
         """
-        if not self.config.get("ENABLE_NOTIFICATIONS", False):
-            return
-            
         change_str = []
         if added:
             change_str.append(f"添加标签: {', '.join(added)}")
         if removed:
             change_str.append(f"移除标签: {', '.join(removed)}")
-            
+
         message = f"{platform.upper()} PR #{pr_id} ({owner}/{repo}) 标签变化: {' '.join(change_str)}"
         logger.info(message)
-        
-        # 触发自动化规则
-        self._trigger_automation(TriggerType.LABEL_CHANGED.value, platform, owner, repo, pr_id, {
-            'added_labels': list(added),
-            'removed_labels': list(removed)
-        })
-        
-        # TODO: 实现实际的通知功能，如邮件、Webhook 等
+
+        # 触发自动化规则，无论是否启用通知
+        self._trigger_automation(
+            TriggerType.LABEL_CHANGED.value,
+            platform,
+            owner,
+            repo,
+            pr_id,
+            {
+                'added_labels': list(added),
+                'removed_labels': list(removed)
+            }
+        )
+
+        # 根据配置决定是否发送通知
+        if self.config.get("ENABLE_NOTIFICATIONS", False):
+            # TODO: 实现实际的通知功能，如邮件、Webhook 等
+            pass
     
     def _trigger_automation(self, event_type: str, platform: str, owner: str, repo: str, pr_id: int, extra_context: dict = None) -> None:
         """
