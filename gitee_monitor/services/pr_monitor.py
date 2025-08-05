@@ -55,10 +55,10 @@ class PRCache:
     def __init__(self, ttl: int = 300):
         self.cache: Dict[str, Dict[str, Any]] = {}
         self.ttl = ttl
-        self._lock = asyncio.Lock()
+        self._lock = threading.Lock()
 
     async def get(self, cache_key: str) -> Optional[Dict[str, Any]]:
-        async with self._lock:
+        with self._lock:
             if cache_key in self.cache:
                 entry = self.cache[cache_key]
                 if datetime.now() < entry["expires"]:
@@ -68,19 +68,19 @@ class PRCache:
             return None
 
     async def set(self, cache_key: str, data: Dict[str, Any]) -> None:
-        async with self._lock:
+        with self._lock:
             self.cache[cache_key] = {
                 "data": data,
                 "expires": datetime.now() + timedelta(seconds=self.ttl)
             }
 
     async def invalidate(self, cache_key: str) -> None:
-        async with self._lock:
+        with self._lock:
             if cache_key in self.cache:
                 del self.cache[cache_key]
 
     async def clear_expired(self) -> None:
-        async with self._lock:
+        with self._lock:
             now = datetime.now()
             expired_keys = [key for key, entry in self.cache.items() if now >= entry["expires"]]
             for key in expired_keys:
@@ -170,13 +170,14 @@ class PRMonitor:
         self.running = False
         self.poll_thread = None
 
-        # 异步相关设置
+        # 异步相关设置（在事件循环中初始化）
         self.max_concurrent_requests = self.config.get("MAX_CONCURRENT_REQUESTS", 10)
-        self.semaphore = asyncio.Semaphore(self.max_concurrent_requests)
+        self.semaphore: Optional[asyncio.Semaphore] = None
         self.requests_per_second = self.config.get("REQUESTS_PER_SECOND_ASYNC", 5.0)
         self.min_request_interval = 1.0 / self.requests_per_second
         self.last_request_time = 0.0
-        self._rate_limit_lock = asyncio.Lock()
+        self._rate_limit_lock: Optional[asyncio.Lock] = None
+        self._async_loop: Optional[asyncio.AbstractEventLoop] = None
         
         # 初始化自动化引擎
         automation_config_dict = self.config.get_automation_config()
@@ -627,25 +628,32 @@ class PRMonitor:
             added: 新增的标签
             removed: 移除的标签
         """
-        if not self.config.get("ENABLE_NOTIFICATIONS", False):
-            return
-            
         change_str = []
         if added:
             change_str.append(f"添加标签: {', '.join(added)}")
         if removed:
             change_str.append(f"移除标签: {', '.join(removed)}")
-            
+
         message = f"{platform.upper()} PR #{pr_id} ({owner}/{repo}) 标签变化: {' '.join(change_str)}"
         logger.info(message)
-        
-        # 触发自动化规则
-        self._trigger_automation(TriggerType.LABEL_CHANGED.value, platform, owner, repo, pr_id, {
-            'added_labels': list(added),
-            'removed_labels': list(removed)
-        })
-        
-        # TODO: 实现实际的通知功能，如邮件、Webhook 等
+
+        # 触发自动化规则，无论是否启用通知
+        self._trigger_automation(
+            TriggerType.LABEL_CHANGED.value,
+            platform,
+            owner,
+            repo,
+            pr_id,
+            {
+                'added_labels': list(added),
+                'removed_labels': list(removed)
+            }
+        )
+
+        # 根据配置决定是否发送通知
+        if self.config.get("ENABLE_NOTIFICATIONS", False):
+            # TODO: 实现实际的通知功能，如邮件、Webhook 等
+            pass
     
     def _trigger_automation(self, event_type: str, platform: str, owner: str, repo: str, pr_id: int, extra_context: dict = None) -> None:
         """
@@ -943,7 +951,15 @@ class PRMonitor:
             "monitor_running": self.running
         }
 
+    def _ensure_asyncio_context(self) -> None:
+        loop = asyncio.get_running_loop()
+        if self._async_loop is not loop:
+            self._async_loop = loop
+            self.semaphore = asyncio.Semaphore(self.max_concurrent_requests)
+            self._rate_limit_lock = asyncio.Lock()
+
     async def _rate_limit_async(self):
+        self._ensure_asyncio_context()
         async with self._rate_limit_lock:
             now = time.time()
             elapsed = now - self.last_request_time
@@ -952,6 +968,7 @@ class PRMonitor:
             self.last_request_time = time.time()
 
     async def get_pr_info_async(self, owner: str, repo: str, pr_id: int) -> Optional[Dict[str, Any]]:
+        self._ensure_asyncio_context()
         cache_key = f"{owner}/{repo}#{pr_id}"
         cached = await self.cache.get(cache_key)
         if cached:
@@ -974,6 +991,7 @@ class PRMonitor:
                 return None
 
     async def get_multiple_pr_info_async(self, pr_list: List[Dict[str, Any]]) -> List[Optional[Dict[str, Any]]]:
+        self._ensure_asyncio_context()
         start_time = time.time()
         tasks = [self.get_pr_info_async(pr['owner'], pr['repo'], pr['pr_id']) for pr in pr_list]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -990,6 +1008,7 @@ class PRMonitor:
         return processed
 
     async def get_author_prs_async(self, owner: str, repo: str, author: str) -> List[Dict[str, Any]]:
+        self._ensure_asyncio_context()
         async with self.semaphore:
             await self._rate_limit_async()
             async with gitee_api.GiteeAPIClient(self.config.get_api_url('gitee'), self.config.get_access_token('gitee')) as client:
@@ -1003,10 +1022,12 @@ class PRMonitor:
         return valid
 
     async def refresh_cache_async(self) -> None:
+        self._ensure_asyncio_context()
         await self.cache.clear_expired()
         logger.debug("异步缓存刷新完成")
 
     async def add_pr_labels_async(self, owner: str, repo: str, pr_id: int, labels: List[str]) -> bool:
+        self._ensure_asyncio_context()
         async with self.semaphore:
             await self._rate_limit_async()
             async with gitee_api.GiteeAPIClient(self.config.get_api_url('gitee'), self.config.get_access_token('gitee')) as client:
@@ -1017,6 +1038,7 @@ class PRMonitor:
                 return success
 
     async def remove_pr_label_async(self, owner: str, repo: str, pr_id: int, label: str) -> bool:
+        self._ensure_asyncio_context()
         async with self.semaphore:
             await self._rate_limit_async()
             async with gitee_api.GiteeAPIClient(self.config.get_api_url('gitee'), self.config.get_access_token('gitee')) as client:
