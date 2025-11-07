@@ -71,7 +71,9 @@ class WebApp:
                         if github_token:
                             self.config.set_platform_config('github', access_token=github_token)
                         self.config.save_config()
-                        logger.info("API 配置更新完成")
+                        # 重新初始化API客户端以应用新的访问令牌
+                        self.pr_monitor.reinitialize_api_clients()
+                        logger.info("API 配置更新完成，已重新初始化API客户端")
                 elif action == 'add_pr':
                     pr_url = request.form.get('pr_url', '').strip()
                     
@@ -106,7 +108,9 @@ class WebApp:
                         else:
                             self.config.add_followed_author(author, repo, platform)
                             self.config.save_config()
-                            logger.info(f"通过表单添加关注作者 {author} 的仓库 {repo} (平台: {platform})")
+                            # 重新初始化API客户端，确保新平台的客户端可用
+                            self.pr_monitor.reinitialize_api_clients()
+                            logger.info(f"通过表单添加关注作者 {author} 的仓库 {repo} (平台: {platform})，已重新初始化API客户端")
                 if error:
                     return render_template('config.html', config=self.config, error=error)
                 return redirect(url_for('config_page'))
@@ -495,7 +499,9 @@ class WebApp:
             if github_access_token:
                 self.config.set_platform_config('github', access_token=github_access_token)
             self.config.save_config()
-            logger.info("通过 API 更新多平台 API 配置")
+            # 重新初始化API客户端以应用新的访问令牌
+            self.pr_monitor.reinitialize_api_clients()
+            logger.info("通过 API 更新多平台 API 配置，已重新初始化API客户端")
             
             return jsonify({'success': True, 'message': 'API 配置更新成功'})
             
@@ -526,7 +532,9 @@ class WebApp:
                 
             self.config.add_followed_author(author, repo, platform)
             self.config.save_config()
-            logger.info(f"通过 API 添加关注作者 {author} 的仓库 {repo} (平台: {platform})")
+            # 重新初始化API客户端，确保新平台的客户端可用
+            self.pr_monitor.reinitialize_api_clients()
+            logger.info(f"通过 API 添加关注作者 {author} 的仓库 {repo} (平台: {platform})，已重新初始化API客户端")
             
             # 获取新添加作者的PR列表
             try:

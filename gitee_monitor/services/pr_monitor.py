@@ -183,6 +183,73 @@ class PRMonitor:
         automation_config = AutomationConfig.from_dict(automation_config_dict)
         self.automation_engine = AutomationEngine(self.api_clients, self.config, automation_config)
         logger.info("自动化引擎已初始化")
+    
+    def reinitialize_api_clients(self) -> None:
+        """
+        重新初始化API客户端
+        在配置更新（特别是ACCESS_TOKEN更新）后调用此方法
+        """
+        logger.info("重新初始化API客户端...")
+        
+        # 重新检测需要的平台
+        detected_platforms = set()
+        available_platforms = {
+            p.get("NAME") for p in self.config.get_platforms()
+            if p.get("ACCESS_TOKEN")
+        }
+
+        for pr_config in self.config.get_pr_lists():
+            platform = pr_config.get("PLATFORM", "gitee")
+            if platform in available_platforms:
+                detected_platforms.add(platform)
+
+        for author_config in self.config.get_followed_authors():
+            platform = author_config.get("PLATFORM", "gitee")
+            if platform in available_platforms:
+                detected_platforms.add(platform)
+
+        if not detected_platforms:
+            detected_platforms = available_platforms
+
+        self.platforms = list(detected_platforms)
+        logger.info(f"重新检测到需要的平台: {self.platforms}")
+        
+        # 重新创建API客户端
+        new_api_clients: Dict[str, BaseAPIClient] = {}
+        
+        for platform in self.platforms:
+            platform_cfg = self.config.get_platform_config(platform)
+            api_url = platform_cfg.get("API_URL")
+            access_token = platform_cfg.get("ACCESS_TOKEN")
+            
+            if not platform_cfg:
+                logger.warning(f"不支持的平台: {platform}")
+                continue
+                
+            # 检查是否有必要的配置
+            if not access_token:
+                logger.warning(f"跳过创建{platform}API客户端: 缺少访问令牌")
+                continue
+                
+            logger.info(f"正在重新创建{platform}API客户端: api_url={api_url}, has_token={bool(access_token)}")
+            client = APIClientFactory.create_client(platform, api_url, access_token)
+            
+            if client is None:
+                logger.error(f"创建{platform}API客户端失败")
+            else:
+                logger.info(f"{platform}API客户端创建成功: {type(client)}")
+                new_api_clients[platform] = client
+        
+        # 更新API客户端字典
+        self.api_clients = new_api_clients
+        
+        # 重新初始化自动化引擎
+        automation_config_dict = self.config.get_automation_config()
+        automation_config = AutomationConfig.from_dict(automation_config_dict)
+        self.automation_engine = AutomationEngine(self.api_clients, self.config, automation_config)
+        logger.info("自动化引擎已重新初始化")
+        
+        logger.info(f"API客户端重新初始化完成，当前可用平台: {list(self.api_clients.keys())}")
         
     def _get_api_client(self, platform: str) -> Optional[BaseAPIClient]:
         """
@@ -194,7 +261,16 @@ class PRMonitor:
         Returns:
             API客户端实例或None
         """
-        return self.api_clients.get(platform)
+        client = self.api_clients.get(platform)
+        if client is None:
+            logger.warning(f"平台 {platform} 的API客户端不存在，尝试重新初始化...")
+            # 尝试重新加载配置并初始化客户端
+            self.config.load_config()
+            self.reinitialize_api_clients()
+            client = self.api_clients.get(platform)
+            if client is None:
+                logger.error(f"重新初始化后仍无法获取 {platform} API客户端")
+        return client
         
     def start(self) -> None:
         """启动 PR 监控服务"""
